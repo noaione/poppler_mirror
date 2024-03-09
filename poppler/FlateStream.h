@@ -43,12 +43,14 @@ public:
     [[nodiscard]] bool reset() override;
     int getChar() override;
     int lookChar() override;
-    int getRawChar() override;
-    void getRawChars(int nChars, int *buffer) override;
+
     std::optional<std::string> getPSFilter(int psLevel, const char *indent) override;
     bool isBinary(bool last = true) const override;
 
 private:
+    bool hasGetChars() override { return true; }
+    int getChars(int nChars, unsigned *buffer) override;
+
     inline int doGetRawChar()
     {
         if (fill_buffer())
@@ -59,7 +61,6 @@ private:
 
     int fill_buffer(void);
     z_stream d_stream;
-    StreamPredictor *pred;
     int status;
     /* in_buf currently needs to be 1 or we over read from EmbedStreams */
     unsigned char in_buf[1];
