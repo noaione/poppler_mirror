@@ -338,7 +338,6 @@ BaseCryptStream::BaseCryptStream(Stream *strA, const unsigned char *fileKey, Cry
     }
 
     charactersRead = 0;
-    nextCharBuff = EOF;
     autoDelete = true;
 }
 
@@ -352,25 +351,12 @@ BaseCryptStream::~BaseCryptStream()
 bool BaseCryptStream::reset()
 {
     charactersRead = 0;
-    nextCharBuff = EOF;
     return str->reset();
 }
 
 Goffset BaseCryptStream::getPos()
 {
     return charactersRead;
-}
-
-int BaseCryptStream::getChar()
-{
-    // Read next character and empty the buffer, so that a new character will be read next time
-    int c = lookChar();
-    nextCharBuff = EOF;
-
-    if (c != EOF) {
-        charactersRead++;
-    }
-    return c;
 }
 
 bool BaseCryptStream::isBinary(bool last) const
@@ -432,16 +418,11 @@ bool EncryptStream::reset()
     return baseResult;
 }
 
-int EncryptStream::lookChar()
+int EncryptStream::encryptChar()
 {
     unsigned char in[16];
-    int c;
+    int c = EOF;
 
-    if (nextCharBuff != EOF) {
-        return nextCharBuff;
-    }
-
-    c = EOF; // make gcc happy
     switch (algo) {
     case cryptRC4:
         if ((c = str->getChar()) != EOF) {
@@ -474,7 +455,11 @@ int EncryptStream::lookChar()
     case cryptNone:
         break;
     }
-    return (nextCharBuff = c);
+
+    if (c != EOF) {
+        charactersRead++;
+    }
+    return c;
 }
 
 //------------------------------------------------------------------------
@@ -516,16 +501,11 @@ bool DecryptStream::reset()
     return baseResult;
 }
 
-int DecryptStream::lookChar()
+int DecryptStream::decryptChar()
 {
     unsigned char in[16];
-    int c;
+    int c = EOF;
 
-    if (nextCharBuff != EOF) {
-        return nextCharBuff;
-    }
-
-    c = EOF; // make gcc happy
     switch (algo) {
     case cryptRC4:
         if ((c = str->getChar()) != EOF) {
@@ -559,7 +539,11 @@ int DecryptStream::lookChar()
     case cryptNone:
         break;
     }
-    return (nextCharBuff = c);
+    if (c != EOF) {
+        charactersRead++;
+    }
+
+    return c;
 }
 
 //------------------------------------------------------------------------

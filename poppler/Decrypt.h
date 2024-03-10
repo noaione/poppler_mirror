@@ -98,8 +98,7 @@ public:
     ~BaseCryptStream() override;
     StreamKind getKind() const override { return strCrypt; }
     [[nodiscard]] bool reset() override;
-    int getChar() override;
-    int lookChar() override = 0;
+
     Goffset getPos() override;
     bool isBinary(bool last) const override;
     Stream *getUndecodedStream() override { return this; }
@@ -110,7 +109,6 @@ protected:
     int objKeyLength;
     unsigned char objKey[32];
     Goffset charactersRead; // so that getPos() can be correct
-    int nextCharBuff; // EOF means not read yet
     bool autoDelete;
 
     union {
@@ -130,7 +128,10 @@ public:
     EncryptStream(Stream *strA, const unsigned char *fileKey, CryptAlgorithm algoA, int keyLength, Ref ref);
     ~EncryptStream() override;
     [[nodiscard]] bool reset() override;
-    int lookChar() override;
+    polyfillGetSomeChars(encryptChar);
+
+private:
+    int encryptChar();
 };
 
 class DecryptStream : public BaseCryptStream
@@ -139,7 +140,10 @@ public:
     DecryptStream(Stream *strA, const unsigned char *fileKey, CryptAlgorithm algoA, int keyLength, Ref ref);
     ~DecryptStream() override;
     [[nodiscard]] bool reset() override;
-    int lookChar() override;
+    polyfillGetSomeChars(decryptChar);
+
+private:
+    int decryptChar();
 };
 
 //------------------------------------------------------------------------

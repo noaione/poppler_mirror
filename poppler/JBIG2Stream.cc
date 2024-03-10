@@ -1206,22 +1206,6 @@ void JBIG2Stream::close()
     FilterStream::close();
 }
 
-int JBIG2Stream::getChar()
-{
-    if (dataPtr && dataPtr < dataEnd) {
-        return (*dataPtr++ ^ 0xff) & 0xff;
-    }
-    return EOF;
-}
-
-int JBIG2Stream::lookChar()
-{
-    if (dataPtr && dataPtr < dataEnd) {
-        return (*dataPtr ^ 0xff) & 0xff;
-    }
-    return EOF;
-}
-
 Goffset JBIG2Stream::getPos()
 {
     if (pageBitmap == nullptr) {
@@ -1230,7 +1214,7 @@ Goffset JBIG2Stream::getPos()
     return dataPtr - pageBitmap->getDataPtr();
 }
 
-int JBIG2Stream::getChars(int nChars, unsigned char *buffer)
+int JBIG2Stream::getSomeChars(int nChars, unsigned char *buffer)
 {
     int n, i;
 
