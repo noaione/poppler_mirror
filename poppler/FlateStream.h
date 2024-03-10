@@ -37,17 +37,15 @@ extern "C" {
 class FlateStream : public FilterStream
 {
 public:
-    FlateStream(Stream *strA, int predictor, int columns, int colors, int bits);
+    FlateStream(Stream *strA, int columns, int colors, int bits);
     virtual ~FlateStream();
     StreamKind getKind() const override { return strFlate; }
     [[nodiscard]] bool reset() override;
-    int getChar() override;
-    int lookChar() override;
 
     std::optional<std::string> getPSFilter(int psLevel, const char *indent) override;
     bool isBinary(bool last = true) const override;
 
-    int getSomeChars(int nChars, unsigned *buffer) override;
+    int getSomeChars(int nChars, unsigned char *buffer) override;
 
 private:
     inline int doGetRawChar()

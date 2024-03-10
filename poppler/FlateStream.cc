@@ -30,7 +30,6 @@ FlateStream::FlateStream(Stream *strA, int columns, int colors, int bits) : Filt
 FlateStream::~FlateStream()
 {
     inflateEnd(&d_stream);
-    delete pred;
     delete str;
 }
 
@@ -53,20 +52,7 @@ bool FlateStream::reset()
     return true;
 }
 
-int FlateStream::getChar()
-{
-    return getRawChar();
-}
-
-int FlateStream::lookChar()
-{
-    if (fill_buffer())
-        return EOF;
-
-    return out_buf[out_pos];
-}
-
-int FlateStream::getSomeChars(int nChars, unsigned *buffer)
+int FlateStream::getSomeChars(int nChars, unsigned char *buffer)
 {
     int c;
     int i;
@@ -119,7 +105,7 @@ int FlateStream::fill_buffer()
 
 std::optional<std::string> FlateStream::getPSFilter(int psLevel, const char *indent)
 {
-    if (psLevel < 3 || pred) {
+    if (psLevel < 3) {
         return std::nullopt;
     }
 
