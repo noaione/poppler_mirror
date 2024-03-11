@@ -99,10 +99,10 @@ public:
     StreamKind getKind() const override { return strCrypt; }
     [[nodiscard]] bool reset() override;
 
-    Goffset getPos() override;
     bool isBinary(bool last) const override;
     Stream *getUndecodedStream() override { return this; }
     void setAutoDelete(bool val);
+    Goffset getRawPos() override;
 
 protected:
     CryptAlgorithm algo;

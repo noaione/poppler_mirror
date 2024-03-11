@@ -74,7 +74,7 @@ Lexer::Lexer(XRef *xrefA, std::unique_ptr<Stream> &&str)
     xref = xrefA;
     nextStreamIdx = 1;
 
-    streams.push_back(Object(curStr));
+    streams.push_back(Object(std::move(str)));
 
     curStr = streams[0].getStream();
     (void)curStr->reset();
@@ -97,8 +97,7 @@ Lexer::Lexer(XRef *xrefA, Object *obj)
         }
 
         if (streams.empty()) {
-            Stream *dummy = new EOFStream(nullptr);
-            streams.push_back(Object(dummy));
+            streams.push_back(Object(std::make_unique<EOFStream>(nullptr)));
         }
     }
 

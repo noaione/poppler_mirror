@@ -36,7 +36,6 @@ public:
     StreamKind getKind() const override { return strJPX; }
     [[nodiscard]] bool reset() override;
     void close() override;
-    Goffset getPos() override;
     std::optional<std::string> getPSFilter(int psLevel, const char *indent) override;
     bool isBinary(bool last = true) const override;
     void getImageParams(int *bitsPerComponent, StreamColorSpaceMode *csMode, bool *hasAlpha) override;
@@ -49,6 +48,7 @@ public:
 
     int readStream(int nChars, unsigned char *buffer) { return str->doGetChars(nChars, buffer); }
     int getSomeChars(int nChars, unsigned char *buffer) override;
+    Goffset getRawPos() override;
 
 private:
     JPXStreamPrivate *priv;
