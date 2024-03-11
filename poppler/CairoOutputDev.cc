@@ -3099,7 +3099,7 @@ cleanup:
 
 bool CairoOutputDev::getStreamData(Stream *str, char **buffer, int *length)
 {
-    int len, i;
+    int len;
     char *strBuffer;
 
     len = 0;
@@ -3120,9 +3120,7 @@ bool CairoOutputDev::getStreamData(Stream *str, char **buffer, int *length)
 
     strBuffer = (char *)gmalloc(len);
 
-    for (i = 0; i < len; ++i) {
-        strBuffer[i] = str->getChar();
-    }
+    str->doGetChars(len, (unsigned char *)strBuffer);
 
     *buffer = strBuffer;
     *length = len;

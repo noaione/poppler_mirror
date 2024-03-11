@@ -175,16 +175,28 @@ public:
         }
     }
 
+    unsigned char *getSomeBufferedChars(int *nCharsOut)
+    {
+        if (bufPtr == bufEnd)
+            fillCacheBuf();
+        *nCharsOut = bufEnd - bufPtr;
+        auto res = bufPtr;
+        bufPtr = bufEnd;
+        return res;
+    }
+
     inline void fillString(std::string &s)
     {
-        unsigned char readBuf[4096];
         int readChars;
         if (!reset()) {
             s.clear();
             return;
         }
-        while ((readChars = doGetChars(4096, readBuf)) != 0) {
-            s.append((const char *)readBuf, readChars);
+        while (true) {
+            auto chars = getSomeBufferedChars(&readChars);
+            if (readChars == 0)
+                return;
+            s.append((const char *)chars, readChars);
         }
     }
 
