@@ -545,8 +545,9 @@ void FilterStream::setPos(Goffset pos, int dir)
 
 Stream *FilterStream::asPredictedStream(int predictor, int columns, int colors, int bits)
 {
-    if (predictor == 1)
+    if (predictor == 1) {
         return this;
+    }
     auto *pred = new StreamPredictor(this, predictor, columns, colors, bits);
     if (!pred->isOk()) {
         delete pred;
@@ -935,8 +936,9 @@ int FileStream::getSomeChars(int nChars, unsigned char *buffer)
         }
     }
     int got = file->read((char *)buffer, nChars, offset);
-    if (got < 0)
+    if (got < 0) {
         got = 0;
+    }
     offset += got;
     return got;
 }
@@ -1175,8 +1177,9 @@ int EmbedStream::getSomeChars(int nChars, unsigned char *buffer)
     } else {
         if (limited) {
             if (length < nChars) {
-                if (length == 0)
+                if (length == 0) {
                     return 0;
+                }
                 nChars = length;
             }
         }
@@ -4441,8 +4444,9 @@ int BufStream::lookAheadChar(int idx)
         bufPtr = buf;
         while (idx > remaining) {
             int got = getSomeChars(streamBufSize - remaining, buf + remaining);
-            if (got == 0)
+            if (got == 0) {
                 return EOF;
+            }
             remaining += got;
         }
         bufEnd = buf + remaining;

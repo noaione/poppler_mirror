@@ -74,7 +74,7 @@ Lexer::Lexer(XRef *xrefA, std::unique_ptr<Stream> &&str)
     xref = xrefA;
     nextStreamIdx = 1;
 
-    streams.push_back(Object(std::move(str)));
+    streams.emplace_back(std::move(str));
 
     curStr = streams[0].getStream();
     (void)curStr->reset();
@@ -86,18 +86,18 @@ Lexer::Lexer(XRef *xrefA, Object *obj)
     nextStreamIdx = 1;
 
     if (obj->isStream()) {
-        streams.push_back(obj->copy());
+        streams.emplace_back(obj->copy());
     } else {
         auto arr = obj->getArray();
         for (int i = 0; i < arr->getLength(); i++) {
             auto elem = arr->get(i);
             if (elem.isStream()) {
-                streams.push_back(std::move(elem));
+                streams.emplace_back(std::move(elem));
             }
         }
 
         if (streams.empty()) {
-            streams.push_back(Object(std::make_unique<EOFStream>(nullptr)));
+            streams.emplace_back(std::make_unique<MemStream>(nullptr, 0, 0, Object()));
         }
     }
 
