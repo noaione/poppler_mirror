@@ -466,13 +466,15 @@ int EncryptStream::encryptChar()
 // DecryptStream
 //------------------------------------------------------------------------
 
-DecryptStream::DecryptStream(Stream *strA, const unsigned char *fileKey, CryptAlgorithm algoA, int keyLength, Ref refA) : BaseCryptStream(strA, fileKey, algoA, keyLength, refA) { }
+DecryptStream::DecryptStream(Stream *strA, const unsigned char *fileKey, CryptAlgorithm algoA, int keyLength, Ref refA) : BaseCryptStream(strA, fileKey, algoA, keyLength, refA)
+{
+    eof = false;
+}
 
 DecryptStream::~DecryptStream() = default;
 
 bool DecryptStream::reset()
 {
-    int i;
     bool baseResult = BaseCryptStream::reset();
 
     switch (algo) {
@@ -482,21 +484,18 @@ bool DecryptStream::reset()
         break;
     case cryptAES:
         aesKeyExpansion(&state.aes, objKey, objKeyLength, true);
-        for (i = 0; i < 16; ++i) {
-            state.aes.cbc[i] = str->getChar();
-        }
+        str->doGetChars(16, state.aes.cbc);
         state.aes.bufIdx = 16;
         break;
     case cryptAES256:
         aes256KeyExpansion(&state.aes256, objKey, objKeyLength, true);
-        for (i = 0; i < 16; ++i) {
-            state.aes256.cbc[i] = str->getChar();
-        }
+        str->doGetChars(16, state.aes256.cbc);
         state.aes256.bufIdx = 16;
         break;
     case cryptNone:
         break;
     }
+    eof = false;
 
     return baseResult;
 }
@@ -505,6 +504,9 @@ int DecryptStream::decryptChar()
 {
     unsigned char in[16];
     int c = EOF;
+    if (eof) {
+        return c;
+    }
 
     switch (algo) {
     case cryptRC4:
@@ -539,7 +541,9 @@ int DecryptStream::decryptChar()
     case cryptNone:
         break;
     }
-    if (c != EOF) {
+    if (c == EOF) {
+        eof = true;
+    } else {
         charactersRead++;
     }
 
@@ -596,13 +600,7 @@ static bool aesReadBlock(Stream *str, unsigned char *in, bool addPadding)
 {
     int c, i;
 
-    for (i = 0; i < 16; ++i) {
-        if ((c = str->getChar()) != EOF) {
-            in[i] = (unsigned char)c;
-        } else {
-            break;
-        }
-    }
+    i = str->doGetChars(16, in);
 
     if (i == 16) {
         return true;
