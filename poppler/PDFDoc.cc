@@ -661,6 +661,15 @@ Linearization *PDFDoc::getLinearization()
     return linearization;
 }
 
+void PDFDoc::resetLinearization()
+{
+    if (!pageCache.empty()) {
+        pageCache.clear();
+    }
+    linearization = new Linearization(nullptr);
+    linearizationState = 0;
+}
+
 bool PDFDoc::checkLinearization()
 {
     if (linearization == nullptr) {
