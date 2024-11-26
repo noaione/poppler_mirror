@@ -52,6 +52,7 @@
 #include <optional>
 #include <unordered_map>
 #include <vector>
+#include <map>
 
 class PDFDoc;
 class XRef;
@@ -268,6 +269,11 @@ public:
     std::unique_ptr<LinkAction> getAdditionalAction(DocumentAdditionalActionsType type);
 
     std::unique_ptr<LinkAction> getOpenAction() const;
+
+    std::map<Ref, Ref> insertPage(Page *page, int num);
+    std::map<Ref, Ref> insertPage(Page *page, int num, std::optional<std::map<Ref, Ref>> &refMap);
+    std::pair<std::map<Ref, Ref>, Page *> insertPageRef(Ref &pageRef, PDFDoc *pageDoc, int num, std::optional<std::map<Ref, Ref>> &refMap);
+    void removePage(Page *page);
 
 private:
     // Get page label info.

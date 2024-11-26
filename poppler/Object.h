@@ -46,6 +46,7 @@
 #include "goo/GooLikely.h"
 #include "Error.h"
 #include "poppler_private_export.h"
+#include <functional>
 
 #define OBJECT_TYPE_CHECK(wanted_type)                                                                                                                                                                                                         \
     if (unlikely(type != (wanted_type))) {                                                                                                                                                                                                     \
