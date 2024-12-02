@@ -349,7 +349,6 @@ gboolean poppler_attachment_save_to_callback(PopplerAttachment *attachment, Popp
 {
     PopplerAttachmentPrivate *priv;
     Stream *stream;
-    int i;
 
     g_return_val_if_fail(POPPLER_IS_ATTACHMENT(attachment), FALSE);
     priv = GET_PRIVATE(attachment);
@@ -360,11 +359,11 @@ gboolean poppler_attachment_save_to_callback(PopplerAttachment *attachment, Popp
     }
 
     while (true) {
-        auto chars = stream->getSomeBufferedChars(&i);
-        if (i == 0) {
+        auto chars = stream->getSomeBufferedChars();
+        if (chars.empty()) {
             return TRUE;
         }
-        if (!(save_func)((gchar *)chars, i, user_data, error)) {
+        if (!(save_func)((gchar *)chars.data(), chars.size(), user_data, error)) {
             return FALSE;
         }
     }
