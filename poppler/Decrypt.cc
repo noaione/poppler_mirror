@@ -351,6 +351,7 @@ BaseCryptStream::~BaseCryptStream()
 bool BaseCryptStream::reset()
 {
     charactersRead = 0;
+    purgeBuffer();
     return str->reset();
 }
 

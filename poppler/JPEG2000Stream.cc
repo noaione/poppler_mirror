@@ -83,6 +83,7 @@ JPXStream::~JPXStream()
 
 bool JPXStream::reset()
 {
+    purgeBuffer();
     priv->counter = 0;
     priv->ccounter = 0;
 

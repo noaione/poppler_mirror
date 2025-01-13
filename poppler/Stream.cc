@@ -1585,8 +1585,8 @@ RunLengthStream::~RunLengthStream()
 
 bool RunLengthStream::reset()
 {
-    bufPtr = bufEnd = buf;
     purgeBuffer();
+    bufPtr = bufEnd = buf;
     eof = false;
 
     return str->reset();
@@ -4478,6 +4478,7 @@ FixedLengthEncoder::~FixedLengthEncoder()
 
 bool FixedLengthEncoder::reset()
 {
+    purgeBuffer();
     count = 0;
 
     return str->reset();
@@ -4518,6 +4519,7 @@ ASCIIHexEncoder::~ASCIIHexEncoder()
 bool ASCIIHexEncoder::reset()
 {
     bufPtr = bufEnd = buf;
+    purgeBuffer();
     lineLen = 0;
     eof = false;
 
@@ -4568,6 +4570,7 @@ ASCII85Encoder::~ASCII85Encoder()
 
 bool ASCII85Encoder::reset()
 {
+    purgeBuffer();
     bufPtr = bufEnd = buf;
     lineLen = 0;
     eof = false;
@@ -4664,6 +4667,7 @@ RunLengthEncoder::~RunLengthEncoder()
 
 bool RunLengthEncoder::reset()
 {
+    purgeBuffer();
     bufPtr = bufEnd = nextEnd = buf;
     eof = false;
 
@@ -4780,6 +4784,7 @@ bool LZWEncoder::reset()
     int i;
 
     bool success = str->reset();
+    purgeBuffer();
 
     // initialize code table
     for (i = 0; i < 256; ++i) {
@@ -4913,6 +4918,7 @@ CMYKGrayEncoder::~CMYKGrayEncoder()
 
 bool CMYKGrayEncoder::reset()
 {
+    purgeBuffer();
     bufPtr = bufEnd = buf;
     eof = false;
 
@@ -4963,6 +4969,7 @@ RGBGrayEncoder::~RGBGrayEncoder()
 
 bool RGBGrayEncoder::reset()
 {
+    purgeBuffer();
     bufPtr = bufEnd = buf;
     eof = false;
 
@@ -5010,6 +5017,7 @@ SplashBitmapCMYKEncoder::~SplashBitmapCMYKEncoder() = default;
 
 bool SplashBitmapCMYKEncoder::reset()
 {
+    purgeBuffer();
     bufPtr = width;
     curLine = height - 1;
 
