@@ -761,7 +761,7 @@ public:
     ~MemStream() override;
 };
 
-class AutoFreeMemStream final : public BaseMemStream<const char>
+class AutoFreeMemStream : public BaseMemStream<const char>
 {
     bool filterRemovalForbidden = false;
     std::vector<char> m_data;
