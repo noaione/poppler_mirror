@@ -2295,6 +2295,14 @@ std::map<Ref, Ref> PDFDoc::insertPage(Page *page, int num, std::optional<std::ma
     return getCatalog()->insertPage(page, num, refMap);
 }
 
+Page *PDFDoc::insertBlankPage(int num)
+{
+    if (isLinearized()) {
+        resetLinearization();
+    }
+    return getCatalog()->insertBlankPage(num);
+}
+
 void PDFDoc::removePage(Page *page)
 {
     if (isLinearized()) {

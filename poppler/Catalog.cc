@@ -1449,6 +1449,15 @@ std::map<Ref, Ref> Catalog::insertPage(Page *page, int pageNum, std::optional<st
     return insertPageRef(pageRef, page->getDoc(), pageNum, refMap).first;
 }
 
+Page *Catalog::insertBlankPage(int num)
+{
+    Object pageDict = Object(new Dict(xref));
+    pageDict.dictSet("name", Object(objName, "Page"));
+    Ref r = xref->addIndirectObject(pageDict);
+    std::optional<std::map<Ref, Ref>> refMap = {};
+    return insertPageRef(r, doc, num, refMap).second;
+}
+
 void Catalog::removePage(Page *page)
 {
     int toRemove = page->getNum();
