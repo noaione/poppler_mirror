@@ -224,13 +224,11 @@ static std::vector<std::unique_ptr<X509CertificateInfo>> getAvailableSigningCert
 #ifdef ENABLE_NSS3
     bool wrongPassword = false;
     bool passwordNeeded = false;
-    auto passwordCallback = [&passwordNeeded, &wrongPassword](const char *) -> char * {
-        static bool firstTime = true;
-        if (!firstTime) {
+    auto passwordCallback = [&passwordNeeded, &wrongPassword](const char *, bool retry) -> char * {
+        if (retry) {
             wrongPassword = true;
             return nullptr;
         }
-        firstTime = false;
         if (nssPassword.getLength() > 0) {
             return strdup(nssPassword.c_str());
         } else {
