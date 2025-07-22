@@ -159,7 +159,7 @@ if(ENABLE_NSS3)
     pdf-validate-signature.cc
   )
   add_executable(pdf-validate-signature ${pdf_validate_signature_SRCS})
-  target_link_libraries(pdf-validate-signature poppler)
+  target_link_libraries(pdf-validate-signature poppler PkgConfig::NSS3)
 
   set(VALIDATE_SIGNATURE_PATH ${EXECUTABLE_OUTPUT_PATH}/pdf-validate-signature)
 
