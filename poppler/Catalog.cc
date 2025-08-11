@@ -1348,6 +1348,49 @@ static Object copyObjectsToXRefMap(XRef *sourceXRef, XRef *destXRef, Object &sou
     }
 }
 
+static void markObjects(std::set<Ref> &seen, XRef *xref, const Object &obj)
+{
+    auto rec = [&](const Object &obj) { markObjects(seen, xref, obj); };
+
+    switch (obj.getType()) {
+    case objArray: {
+        Array *array = obj.getArray();
+        for (int i = 0; i < array->getLength(); i++) {
+            rec(array->getNF(i));
+        }
+        break;
+    }
+    case objDict: {
+        Dict *dict = obj.getDict();
+
+        for (int i = 0; i < dict->getLength(); i++) {
+            rec(dict->getValNF(i));
+        }
+        break;
+    }
+    case objStream: {
+        Stream *stream = obj.getStream();
+
+        Dict *dict = stream->getDict();
+        for (int i = 0; i < dict->getLength(); i++) {
+            rec(dict->getValNF(i));
+        }
+        break;
+    }
+    case objRef: {
+        Ref ref = obj.getRef();
+        if (!seen.contains(ref)) {
+            seen.insert(ref);
+            Object o = xref->fetch(ref);
+            rec(o);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 static std::pair<Ref, std::map<Ref, Ref>> copyObjectsToXRef(XRef *sourceXRef, XRef *destXRef, Ref sourceRef, Object &parent, std::optional<std::map<Ref, Ref>> &refMap)
 {
     refMap = refMap.value_or(std::map<Ref, Ref>());
@@ -1496,4 +1539,21 @@ void Catalog::removePage(Page *page)
         free(pageLabelInfo);
         pageLabelInfo = nullptr;
     }
+    std::set<Ref> usedObjects;
+    markObjects(usedObjects, xref, Object(xref->getRoot()));
+    markObjects(usedObjects, xref, xref->getCatalog());
+    markObjects(usedObjects, xref, *xref->getTrailerDict());
+
+    for (int i = 0; i < xref->getNumObjects(); i++) {
+        if ((xref->getEntry(i)->type == xrefEntryFree) && (xref->getEntry(i)->gen == 0)) { // we skip the irrelevant free objects
+            continue;
+        }
+        Ref ref;
+        ref.num = i;
+        ref.gen = xref->getEntry(i)->type == xrefEntryCompressed ? 0 : xref->getEntry(i)->gen;
+        if (xref->getEntry(i)->type != xrefEntryFree && !usedObjects.contains(ref)) {
+            xref->removeIndirectObject(ref);
+        }
+    }
+    forcedRewrite = true;
 }
