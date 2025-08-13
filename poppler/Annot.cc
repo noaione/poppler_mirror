@@ -4091,15 +4091,9 @@ void AnnotTextMarkup::draw(Gfx *gfx, bool printing)
         Object aStream = createForm(appearBuilder.buffer(), bbox, true, nullptr);
 
         GooString appearBuf("/GS0 gs\n/Fm0 Do");
-        Dict *resDict = createResourcesDict("Fm0", std::move(aStream), "GS0", 1, blendMultiply ? "Multiply" : nullptr);
-        if (ca == 1) {
-            appearance = createForm(&appearBuf, bbox, false, resDict);
-        } else {
-            aStream = createForm(&appearBuf, bbox, true, resDict);
 
-            Dict *resDict2 = createResourcesDict("Fm0", std::move(aStream), "GS0", ca, nullptr);
-            appearance = createForm(&appearBuf, bbox, false, resDict2);
-        }
+        Dict *resDict = createResourcesDict("Fm0", std::move(aStream), "GS0", ca, blendMultiply ? "Multiply" : nullptr);
+        appearance = createForm(&appearBuf, bbox, false, resDict);
     }
 
     // draw the appearance stream
