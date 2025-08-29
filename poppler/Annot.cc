@@ -2772,9 +2772,9 @@ void AnnotLink::initialize(PDFDoc *docA, Dict *dict)
     /*
     obj1 = dict->lookup("PA");
     if (obj1.isDict()) {
-      uriAction = NULL;
+      uriAction = nullptr;
     } else {
-      uriAction = NULL;
+      uriAction = nullptr;
     }
     obj1.free();
     */
