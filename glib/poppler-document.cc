@@ -108,7 +108,8 @@ enum
     PROP_PRINT_DUPLEX,
     PROP_PRINT_N_COPIES,
     PROP_CREATION_DATETIME,
-    PROP_MOD_DATETIME
+    PROP_MOD_DATETIME,
+    PROP_WRITE_MODE
 };
 }
 
@@ -579,7 +580,7 @@ gboolean poppler_document_save(PopplerDocument *document, const char *uri, GErro
         int err_code;
         g_free(filename);
 
-        err_code = document->doc->saveAs(fname);
+        err_code = document->doc->saveAs(fname, document->write_mode);
         retval = handle_save_error(err_code, error);
     }
 
@@ -662,7 +663,7 @@ gboolean poppler_document_save_to_fd(PopplerDocument *document, int fd, gboolean
 
     stream = new FileOutStream(file, 0);
     if (include_changes) {
-        rv = document->doc->saveAs(stream);
+        rv = document->doc->saveAs(stream, document->write_mode);
     } else {
         rv = document->doc->saveWithoutChangesAs(stream);
     }
@@ -2242,6 +2243,62 @@ gboolean poppler_document_has_javascript(PopplerDocument *document)
     return document->doc->hasJavascript();
 }
 
+/**
+ * poppler_document_get_pdf_write_mode:
+ * @document: A #PopplerDocument
+ *
+ * Returns the write mode as a #PopplerPDFWriteMode
+ *
+ * Returns: the write mode
+ **/
+PopplerPDFWriteMode poppler_document_get_pdf_write_mode(PopplerDocument *document)
+{
+    PopplerPDFWriteMode mode = POPPLER_PDF_WRITE_MODE_STANDARD;
+
+    g_return_val_if_fail(POPPLER_IS_DOCUMENT(document), mode);
+
+    switch (document->write_mode) {
+    case writeStandard:
+        break;
+    case writeForceRewrite:
+        mode = POPPLER_PDF_WRITE_MODE_FORCE_REWRITE;
+        break;
+    case writeForceIncremental:
+        mode = POPPLER_PDF_WRITE_MODE_FORCE_INCREMENTAL;
+        break;
+    default:
+        g_warn_if_reached();
+    }
+
+    return mode;
+}
+
+/**
+ * poppler_document_set_pdf_write_mode:
+ * @document: A #PopplerDocument
+ * @mode: A #PopplerPDFWriteMode
+ *
+ * Sets the document's write mode.
+ **/
+void poppler_document_set_pdf_write_mode(PopplerDocument *document, PopplerPDFWriteMode mode)
+{
+    g_return_if_fail(POPPLER_IS_DOCUMENT(document));
+
+    switch (mode) {
+    case POPPLER_PDF_WRITE_MODE_STANDARD:
+        document->write_mode = writeStandard;
+        break;
+    case POPPLER_PDF_WRITE_MODE_FORCE_REWRITE:
+        document->write_mode = writeForceRewrite;
+        break;
+    case POPPLER_PDF_WRITE_MODE_FORCE_INCREMENTAL:
+        document->write_mode = writeForceIncremental;
+        break;
+    default:
+        g_assert_not_reached();
+    }
+}
+
 static void poppler_document_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec)
 {
     PopplerDocument *document = POPPLER_DOCUMENT(object);
@@ -2329,6 +2386,9 @@ static void poppler_document_get_property(GObject *object, guint prop_id, GValue
     case PROP_METADATA:
         g_value_take_string(value, poppler_document_get_metadata(document));
         break;
+    case PROP_WRITE_MODE:
+        g_value_set_enum(value, poppler_document_get_pdf_write_mode(document));
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
     }
@@ -2368,6 +2428,9 @@ static void poppler_document_set_property(GObject *object, guint prop_id, const 
         break;
     case PROP_MOD_DATETIME:
         poppler_document_set_modification_date_time(document, (GDateTime *)g_value_get_boxed(value));
+        break;
+    case PROP_WRITE_MODE:
+        poppler_document_set_pdf_write_mode(document, (PopplerPDFWriteMode)g_value_get_enum(value));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -2580,6 +2643,13 @@ static void poppler_document_class_init(PopplerDocumentClass *klass)
      * Document metadata in XML format, or %NULL
      */
     g_object_class_install_property(G_OBJECT_CLASS(klass), PROP_METADATA, g_param_spec_string("metadata", "XML Metadata", "Embedded XML metadata", nullptr, G_PARAM_READABLE));
+
+    /**
+     * PopplerDocument:write-mode:
+     *
+     * Document write mode
+     */
+    g_object_class_install_property(G_OBJECT_CLASS(klass), PROP_WRITE_MODE, g_param_spec_enum("write-mode", "Write Mode", "The write mode of the document", POPPLER_TYPE_PDF_WRITE_MODE, POPPLER_PDF_WRITE_MODE_STANDARD, G_PARAM_READWRITE));
 }
 
 static void poppler_document_init(PopplerDocument *document) { }

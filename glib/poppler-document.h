@@ -291,6 +291,21 @@ typedef enum
 } PopplerPDFConformance;
 
 /**
+ * PopplerPDFWriteMode:
+ * @POPPLER_PDF_WRITE_MODE_STANDARD: Append changes to the file or create file
+ * @POPPLER_PDF_WRITE_MODE_FORCE_REWRITE: Force complete rewrite of the file
+ * @POPPLER_PDF_WRITE_MODE_FORCE_INCREMENTAL: Force append of changes to the file
+ *
+ * PDF Write Mode
+ */
+typedef enum
+{
+    POPPLER_PDF_WRITE_MODE_STANDARD,
+    POPPLER_PDF_WRITE_MODE_FORCE_REWRITE,
+    POPPLER_PDF_WRITE_MODE_FORCE_INCREMENTAL
+} PopplerPDFWriteMode;
+
+/**
  * PopplerDocument:
  *
  * A poppler document.
@@ -401,6 +416,10 @@ POPPLER_PUBLIC
 gint poppler_document_get_print_n_copies(PopplerDocument *document);
 POPPLER_PUBLIC
 PopplerPageRange *poppler_document_get_print_page_ranges(PopplerDocument *document, int *n_ranges) G_GNUC_MALLOC;
+POPPLER_PUBLIC
+PopplerPDFWriteMode poppler_document_get_pdf_write_mode(PopplerDocument *document);
+POPPLER_PUBLIC
+void poppler_document_set_pdf_write_mode(PopplerDocument *document, PopplerPDFWriteMode mode);
 
 /* Attachments */
 POPPLER_PUBLIC

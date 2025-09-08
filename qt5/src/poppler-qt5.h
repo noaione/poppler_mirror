@@ -2235,6 +2235,13 @@ public:
     };
     Q_DECLARE_FLAGS(PDFOptions, PDFOption)
 
+    enum PDFWriteMode
+    {
+        Standard, ///> Append changes to the file or create file
+        ForceRewrite, ///> Force complete rewrite of the file
+        ForceIncremental, ///> Force append of changes to the file
+    };
+
     /**
       Destructor.
     */
@@ -2248,6 +2255,16 @@ public:
       The currently set options for the PDF export.
      */
     PDFOptions pdfOptions() const;
+
+    /**
+      Sets the PDF write mode.
+     */
+    void setPDFWriteMode(PDFWriteMode mode);
+
+    /**
+      The currently set PDF write mode.
+    */
+    PDFWriteMode pdfWriteMode() const;
 
     /**
      * Holds data for a new signature

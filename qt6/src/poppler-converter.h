@@ -314,6 +314,23 @@ public:
      */
     PDFOptions pdfOptions() const;
 
+    enum PDFWriteMode
+    {
+        Standard, ///> Append changes to the file or create file
+        ForceRewrite, ///> Force complete rewrite of the file
+        ForceIncremental, ///> Force append of changes to the file
+    };
+
+    /**
+      Sets the PDF write mode.
+     */
+    void setPDFWriteMode(PDFWriteMode mode);
+
+    /**
+      The currently set PDF write mode.
+    */
+    PDFWriteMode pdfWriteMode() const;
+
     /**
      * Holds data for a new signature
      *  - Common Name of cert to sign (aka nickname)
