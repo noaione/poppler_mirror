@@ -111,6 +111,7 @@ public:
     void addData(unsigned char *data_block, int data_len) final;
     std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> signDetached(const std::string &password) final;
     CryptoSign::SignatureType signatureType() const final { return CryptoSign::SignatureType::adbe_pkcs7_detached; }
+    unsigned int estimateSize() const final;
 
     NSSSignatureCreation(const NSSSignatureCreation &) = delete;
     NSSSignatureCreation &operator=(const NSSSignatureCreation &) = delete;
@@ -118,6 +119,7 @@ public:
 private:
     std::unique_ptr<HashContext> hashContext;
     CERTCertificate *signing_cert;
+    unsigned int estimated_size;
 };
 
 class POPPLER_PRIVATE_EXPORT NSSSignatureConfiguration
