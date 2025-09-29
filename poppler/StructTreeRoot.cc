@@ -13,13 +13,11 @@
 //
 //========================================================================
 
-#include "goo/GooString.h"
 #include "StructTreeRoot.h"
 #include "StructElement.h"
 #include "PDFDoc.h"
 #include "Object.h"
 #include "Dict.h"
-#include <set>
 #include <cassert>
 
 StructTreeRoot::StructTreeRoot(PDFDoc *docA, const Dict &structTreeRootDict) : doc(docA)
@@ -28,12 +26,7 @@ StructTreeRoot::StructTreeRoot(PDFDoc *docA, const Dict &structTreeRootDict) : d
     parse(structTreeRootDict);
 }
 
-StructTreeRoot::~StructTreeRoot()
-{
-    for (StructElement *element : elements) {
-        delete element;
-    }
-}
+StructTreeRoot::~StructTreeRoot() = default;
 
 void StructTreeRoot::parse(const Dict &root)
 {
@@ -69,34 +62,32 @@ void StructTreeRoot::parse(const Dict &root)
             }
             Object obj = kids.arrayGet(i);
             if (obj.isDict()) {
-                StructElement *child = new StructElement(obj.getDict(), this, nullptr, seenElements);
+                auto child = std::make_unique<StructElement>(obj.getDict(), this, nullptr, seenElements);
                 if (child->isOk()) {
                     if (marked && !(child->getType() == StructElement::Document || child->getType() == StructElement::Part || child->getType() == StructElement::Art || child->getType() == StructElement::Div)) {
                         error(errSyntaxWarning, -1, "StructTreeRoot element of tagged PDF is wrong type ({0:s})", child->getTypeName());
                     }
-                    appendChild(child);
                     if (ref.isRef()) {
-                        parentTreeAdd(ref.getRef(), child);
+                        parentTreeAdd(ref.getRef(), child.get());
                     }
+                    appendChild(std::move(child));
                 } else {
                     error(errSyntaxWarning, -1, "StructTreeRoot element could not be parsed");
-                    delete child;
                 }
             } else {
                 error(errSyntaxWarning, -1, "K has a child of wrong type ({0:s})", obj.getTypeName());
             }
         }
     } else if (kids.isDict()) {
-        StructElement *child = new StructElement(kids.getDict(), this, nullptr, seenElements);
+        auto child = std::make_unique<StructElement>(kids.getDict(), this, nullptr, seenElements);
         if (child->isOk()) {
-            appendChild(child);
             const Object &ref = root.lookupNF("K");
             if (ref.isRef()) {
-                parentTreeAdd(ref.getRef(), child);
+                parentTreeAdd(ref.getRef(), child.get());
             }
+            appendChild(std::move(child));
         } else {
             error(errSyntaxWarning, -1, "StructTreeRoot element could not be parsed");
-            delete child;
         }
     } else if (!kids.isNull()) {
         error(errSyntaxWarning, -1, "K in StructTreeRoot is wrong type ({0:s})", kids.getTypeName());
