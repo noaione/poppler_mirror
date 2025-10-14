@@ -3901,7 +3901,7 @@ static void _poppler_sign_document_thread(GTask *task, PopplerDocument *document
     const PopplerRectangle *rect = poppler_signing_data_get_signature_rectangle(signing_data);
 
     ret = !document->doc
-                   ->sign(signing_data_destination_filename, poppler_certificate_info_get_id((PopplerCertificateInfo *)certificate_info),
+                   ->sign(signing_data_destination_filename, poppler_certificate_info_get_id((PopplerCertificateInfo *)certificate_info), {},
                           poppler_signing_data_get_password(signing_data) ? poppler_signing_data_get_password(signing_data) : "", std::move(field_partial_name), poppler_signing_data_get_page(signing_data) + 1,
                           PDFRectangle(rect->x1, rect->y1, rect->x2, rect->y2), signature_text, signature_text_left, poppler_signing_data_get_font_size(signing_data), poppler_signing_data_get_left_font_size(signing_data),
                           _poppler_convert_poppler_color_to_annot_color(font_color), poppler_signing_data_get_border_width(signing_data), _poppler_convert_poppler_color_to_annot_color(border_color),

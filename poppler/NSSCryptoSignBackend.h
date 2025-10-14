@@ -31,6 +31,7 @@
 #include <functional>
 #include <memory>
 #include <future>
+#include <span>
 
 /* NSPR Headers */
 #include <nspr.h>
@@ -45,6 +46,34 @@
 #include <secmodt.h>
 #include <sechash.h>
 #include "CryptoSignBackend.h"
+
+struct MessageImprint
+{
+    SECAlgorithmID hashAlgorithm;
+    SECItem hashedMessage;
+};
+
+struct Accuracy
+{
+    SECItem seconds;
+    SECItem millis;
+    SECItem micros;
+};
+
+struct TSTInfo
+{
+    SECItem version;
+    MessageImprint messageImprint;
+    SECItem genTime;
+    Accuracy accuracy;
+    SECItem ordering;
+    SECItem nonce;
+};
+
+struct PLArenaFreeFalse
+{
+    void operator()(PLArenaPool *arena) { PORT_FreeArena(arena, PR_FALSE); }
+};
 
 class HashContext
 {
@@ -96,20 +125,22 @@ private:
     NSSCMSSignedData *CMSSignedData;
     NSSCMSSignerInfo *CMSSignerInfo;
     SECItem CMSitem;
+    TSTInfo timeStamp;
     std::unique_ptr<HashContext> hashContext;
     std::future<CertificateValidationStatus> validationStatus;
     std::optional<CertificateValidationStatus> cachedValidationStatus;
+    std::unique_ptr<PLArenaPool, PLArenaFreeFalse> arena;
 };
 
 class NSSSignatureCreation final : public CryptoSign::SigningInterface
 {
 public:
-    NSSSignatureCreation(const std::string &certNickname, HashAlgorithm digestAlgTag);
+    NSSSignatureCreation(const std::string &certNickname, HashAlgorithm digestAlgTag, const std::string &timestampServer);
     ~NSSSignatureCreation() final;
     std::unique_ptr<X509CertificateInfo> getCertificateInfo() const final;
     void addData(unsigned char *data_block, int data_len) final;
     std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> signDetached(const std::string &password) final;
-    CryptoSign::SignatureType signatureType() const final { return CryptoSign::SignatureType::adbe_pkcs7_detached; }
+    CryptoSign::SignatureType signatureType() const final;
 
     NSSSignatureCreation(const NSSSignatureCreation &) = delete;
     NSSSignatureCreation &operator=(const NSSSignatureCreation &) = delete;
@@ -117,6 +148,10 @@ public:
 private:
     std::unique_ptr<HashContext> hashContext;
     CERTCertificate *signing_cert;
+    std::unique_ptr<PLArenaPool, PLArenaFreeFalse> arena;
+    std::string timestamp_server;
+    std::variant<SECItem, CryptoSign::SigningErrorMessage> fetchTimestamp(std::span<unsigned char> messageImprint, const HashAlgorithm algorithm);
+    std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> addTimestampAttribute(const SECItem *encodedSignature, const SECItem *timestampToken);
 };
 
 class POPPLER_PRIVATE_EXPORT NSSSignatureConfiguration
@@ -143,7 +178,7 @@ class NSSCryptoSignBackend final : public CryptoSign::Backend
 {
 public:
     std::unique_ptr<CryptoSign::VerificationInterface> createVerificationHandler(std::vector<unsigned char> &&pkcs7, CryptoSign::SignatureType) final;
-    std::unique_ptr<CryptoSign::SigningInterface> createSigningHandler(const std::string &certID, HashAlgorithm digestAlgTag) final;
+    std::unique_ptr<CryptoSign::SigningInterface> createSigningHandler(const std::string &certID, HashAlgorithm digestAlgTag, const std::string &TimestampServer) final;
     std::vector<std::unique_ptr<X509CertificateInfo>> getAvailableSigningCertificates() final;
     ~NSSCryptoSignBackend() final;
 };

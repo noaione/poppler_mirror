@@ -2269,10 +2269,10 @@ std::variant<PDFDoc::SignatureData, CryptoSign::SigningErrorMessage> PDFDoc::cre
     return SignatureData { { ref.num, ref.gen }, signatureAnnot, formWidget, std::move(field) };
 }
 
-std::optional<CryptoSign::SigningErrorMessage> PDFDoc::sign(const std::string &saveFilename, const std::string &certNickname, const std::string &password, std::unique_ptr<GooString> &&partialFieldName, int page, const PDFRectangle &rect,
-                                                            const GooString &signatureText, const GooString &signatureTextLeft, double fontSize, double leftFontSize, std::unique_ptr<AnnotColor> &&fontColor, double borderWidth,
-                                                            std::unique_ptr<AnnotColor> &&borderColor, std::unique_ptr<AnnotColor> &&backgroundColor, const GooString *reason, const GooString *location, const std::string &imagePath,
-                                                            const std::optional<GooString> &ownerPassword, const std::optional<GooString> &userPassword)
+std::optional<CryptoSign::SigningErrorMessage> PDFDoc::sign(const std::string &saveFilename, const std::string &certNickname, const std::string &timestampServer, const std::string &password, std::unique_ptr<GooString> &&partialFieldName,
+                                                            int page, const PDFRectangle &rect, const GooString &signatureText, const GooString &signatureTextLeft, double fontSize, double leftFontSize,
+                                                            std::unique_ptr<AnnotColor> &&fontColor, double borderWidth, std::unique_ptr<AnnotColor> &&borderColor, std::unique_ptr<AnnotColor> &&backgroundColor, const GooString *reason,
+                                                            const GooString *location, const std::string &imagePath, const std::optional<GooString> &ownerPassword, const std::optional<GooString> &userPassword)
 {
     ::Page *destPage = getPage(page);
     if (destPage == nullptr) {
@@ -2297,7 +2297,7 @@ std::optional<CryptoSign::SigningErrorMessage> PDFDoc::sign(const std::string &s
 
     FormWidgetSignature *fws = dynamic_cast<FormWidgetSignature *>(sig->formWidget);
     if (fws) {
-        const auto res = fws->signDocument(saveFilename, certNickname, password, reason, location, ownerPassword, userPassword);
+        const auto res = fws->signDocument(saveFilename, certNickname, timestampServer, password, reason, location, ownerPassword, userPassword);
 
         // Now remove the signature stuff in case the user wants to continue editing stuff
         // So the document object is clean

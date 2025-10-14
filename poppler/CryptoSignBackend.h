@@ -29,6 +29,7 @@ enum class SignatureType
     adbe_pkcs7_sha1,
     adbe_pkcs7_detached,
     ETSI_CAdES_detached,
+    ETSI_RFC3161,
     g10c_pgp_signature_detached,
     unknown_signature_type,
     unsigned_signature_field
@@ -43,6 +44,8 @@ std::string toStdString(SignatureType type);
 // what we have managed to get nss and gpgme to create.
 static const int maxSupportedSignatureSize = 10000;
 
+static const int maxSupportedTimestampSize = 10000;
+
 enum class SigningError
 {
     GenericError /** Unclassified error*/,
@@ -51,6 +54,7 @@ enum class SigningError
     UserCancelled /**User cancelled the action*/,
     KeyMissing, /**The key/certificate not specified*/
     BadPassphrase, /** Bad passphrase */
+    TimestampError, /** Timestamp unavailable or invalid*/
 
 };
 
@@ -104,7 +108,7 @@ public:
         GPGME
     };
     virtual std::unique_ptr<VerificationInterface> createVerificationHandler(std::vector<unsigned char> &&pkcs7, SignatureType type) = 0;
-    virtual std::unique_ptr<SigningInterface> createSigningHandler(const std::string &certID, HashAlgorithm digestAlgTag) = 0;
+    virtual std::unique_ptr<SigningInterface> createSigningHandler(const std::string &certID, HashAlgorithm digestAlgTag, const std::string &timestampServer) = 0;
     virtual std::vector<std::unique_ptr<X509CertificateInfo>> getAvailableSigningCertificates() = 0;
     virtual ~Backend();
     Backend() = default;

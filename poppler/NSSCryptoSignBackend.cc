@@ -52,6 +52,10 @@
 #include <cms.h>
 #include <cmst.h>
 
+#ifdef ENABLE_LIBCURL
+#    include <curl/curl.h>
+#endif
+
 /**
  * General name, defined by RFC 3280.
  */
@@ -150,7 +154,6 @@ const SEC_ASN1Template ESSCertIDv2Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr
  */
 const SEC_ASN1Template SigningCertificateV2Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(SigningCertificateV2) }, { SEC_ASN1_SEQUENCE_OF, offsetof(SigningCertificateV2, certs), ESSCertIDv2Template, 0 }, { 0, 0, nullptr, 0 } };
 
-/*
 struct PKIStatusInfo
 {
     SECItem status;
@@ -163,18 +166,25 @@ const SEC_ASN1Template PKIStatusInfo_Template[] = { { SEC_ASN1_SEQUENCE, 0, null
                                                     { SEC_ASN1_CONSTRUCTED | SEC_ASN1_SEQUENCE | SEC_ASN1_OPTIONAL, offsetof(PKIStatusInfo, statusString), nullptr, 0 },
                                                     { SEC_ASN1_BIT_STRING | SEC_ASN1_OPTIONAL, offsetof(PKIStatusInfo, failInfo), nullptr, 0 },
                                                     { 0, 0, nullptr, 0 } };
-
-const SEC_ASN1Template Any_Template[] = { { SEC_ASN1_ANY, 0, nullptr, sizeof(SECItem) } };
-
 struct TimeStampResp
 {
     PKIStatusInfo status;
     SECItem timeStampToken;
 };
 
+struct TimeStampReq
+{
+    SECItem version;
+    MessageImprint messageImprint;
+    SECItem reqPolicy;
+    SECItem nonce;
+    SECItem certReq;
+    CERTCertExtension **extensions;
+};
+
 const SEC_ASN1Template TimeStampResp_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(TimeStampResp) },
                                                     { SEC_ASN1_INLINE, offsetof(TimeStampResp, status), PKIStatusInfo_Template, 0 },
-                                                    { SEC_ASN1_ANY | SEC_ASN1_OPTIONAL, offsetof(TimeStampResp, timeStampToken), Any_Template, 0 },
+                                                    { SEC_ASN1_ANY | SEC_ASN1_OPTIONAL, offsetof(TimeStampResp, timeStampToken), SEC_AnyTemplate, 0 },
                                                     { 0, 0, nullptr, 0 } };
 
 const SEC_ASN1Template MessageImprint_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(MessageImprint) },
@@ -182,23 +192,96 @@ const SEC_ASN1Template MessageImprint_Template[] = { { SEC_ASN1_SEQUENCE, 0, nul
                                                      { SEC_ASN1_OCTET_STRING, offsetof(MessageImprint, hashedMessage), nullptr, 0 },
                                                      { 0, 0, nullptr, 0 } };
 
-const SEC_ASN1Template Extension_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(Extension) },
-                                                { SEC_ASN1_OBJECT_ID, offsetof(Extension, extnID), nullptr, 0 },
-                                                { SEC_ASN1_BOOLEAN, offsetof(Extension, critical), nullptr, 0 },
-                                                { SEC_ASN1_OCTET_STRING, offsetof(Extension, extnValue), nullptr, 0 },
-                                                { 0, 0, nullptr, 0 } };
-
-const SEC_ASN1Template Extensions_Template[] = { { SEC_ASN1_SEQUENCE_OF, 0, Extension_Template, 0 } };
-
 const SEC_ASN1Template TimeStampReq_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(TimeStampReq) },
                                                    { SEC_ASN1_INTEGER, offsetof(TimeStampReq, version), nullptr, 0 },
                                                    { SEC_ASN1_INLINE, offsetof(TimeStampReq, messageImprint), MessageImprint_Template, 0 },
                                                    { SEC_ASN1_OBJECT_ID | SEC_ASN1_OPTIONAL, offsetof(TimeStampReq, reqPolicy), nullptr, 0 },
                                                    { SEC_ASN1_INTEGER | SEC_ASN1_OPTIONAL, offsetof(TimeStampReq, nonce), nullptr, 0 },
                                                    { SEC_ASN1_BOOLEAN | SEC_ASN1_OPTIONAL, offsetof(TimeStampReq, certReq), nullptr, 0 },
-                                                   { SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(TimeStampReq, extensions), Extensions_Template, 0 },
+                                                   { SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(TimeStampReq, extensions), CERT_SequenceOfCertExtensionTemplate, 0 },
                                                    { 0, 0, nullptr, 0 } };
-*/
+
+const SEC_ASN1Template Accuracy_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(Accuracy) },
+                                               { SEC_ASN1_INTEGER | SEC_ASN1_OPTIONAL, offsetof(Accuracy, seconds), nullptr, 0 },
+                                               { SEC_ASN1_INLINE | SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(Accuracy, millis), SEC_IntegerTemplate, 0 },
+                                               { SEC_ASN1_INLINE | SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 1, offsetof(Accuracy, micros), SEC_IntegerTemplate, 0 },
+                                               { 0, 0, nullptr, 0 } };
+
+const SEC_ASN1Template TSTInfo_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(TSTInfo) },
+                                              { SEC_ASN1_SKIP, 0, nullptr, 0 },
+                                              { SEC_ASN1_SKIP, 0, nullptr, 0 },
+                                              { SEC_ASN1_INLINE, offsetof(TSTInfo, messageImprint), MessageImprint_Template, 0 },
+                                              { SEC_ASN1_SKIP, 0, nullptr, 0 },
+                                              { SEC_ASN1_GENERALIZED_TIME, offsetof(TSTInfo, genTime), nullptr, 0 },
+                                              { SEC_ASN1_OPTIONAL | SEC_ASN1_INLINE, offsetof(TSTInfo, accuracy), Accuracy_Template, 0 },
+                                              { SEC_ASN1_BOOLEAN | SEC_ASN1_OPTIONAL, offsetof(TSTInfo, ordering), nullptr, 0 },
+                                              { SEC_ASN1_INTEGER | SEC_ASN1_OPTIONAL, offsetof(TSTInfo, nonce), nullptr, 0 },
+                                              { SEC_ASN1_SKIP_REST, 0, nullptr, 0 },
+                                              { 0, 0, nullptr, 0 } };
+
+struct cms_recode_attribute
+{
+    SECItem type;
+    SECItem **values;
+};
+
+struct cms_recode_signer_info
+{
+    SECItem version;
+    SECItem signerIdentifier;
+    SECItem digestAlg;
+    SECItem authAttr;
+    SECItem digestEncAlg;
+    SECItem encDigest;
+    cms_recode_attribute **unAuthAttr;
+};
+
+struct cms_recode_signed_data
+{
+    SECItem version;
+    SECItem digestAlgorithms;
+    SECItem contentInfo;
+    SECItem rawCerts;
+    SECItem crls;
+    cms_recode_signer_info **signerInfos;
+};
+
+struct cms_recode_message
+{
+    SECItem contentType;
+    cms_recode_signed_data signedData;
+};
+
+const SEC_ASN1Template recode_attribute_template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(cms_recode_attribute) },
+                                                       { SEC_ASN1_OBJECT_ID, offsetof(cms_recode_attribute, type), nullptr, 0 },
+                                                       { SEC_ASN1_SET_OF, offsetof(cms_recode_attribute, values), SEC_AnyTemplate, 0 },
+                                                       { 0, 0, nullptr, 0 } };
+
+const SEC_ASN1Template recode_set_of_attribute_template[] = { { SEC_ASN1_SET_OF, 0, recode_attribute_template, 0 } };
+
+const SEC_ASN1Template recode_signer_info_template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(cms_recode_signer_info) },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signer_info, version), nullptr, 0 },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signer_info, signerIdentifier), nullptr, 0 },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signer_info, digestAlg), nullptr, 0 },
+                                                         { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(cms_recode_signer_info, authAttr), SEC_AnyTemplate, 0 },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signer_info, digestEncAlg), nullptr, 0 },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signer_info, encDigest), nullptr, 0 },
+                                                         { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 1, offsetof(cms_recode_signer_info, unAuthAttr), recode_set_of_attribute_template, 0 },
+                                                         { 0, 0, nullptr, 0 } };
+
+const SEC_ASN1Template recode_signed_data_template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(cms_recode_signed_data) },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signed_data, version), nullptr, 0 },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signed_data, digestAlgorithms), nullptr, 0 },
+                                                         { SEC_ASN1_ANY, offsetof(cms_recode_signed_data, contentInfo), nullptr, 0 },
+                                                         { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(cms_recode_signed_data, rawCerts), SEC_AnyTemplate, 0 },
+                                                         { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 1, offsetof(cms_recode_signed_data, crls), SEC_AnyTemplate, 0 },
+                                                         { SEC_ASN1_SET_OF, offsetof(cms_recode_signed_data, signerInfos), recode_signer_info_template, 0 },
+                                                         { 0, 0, nullptr, 0 } };
+
+const SEC_ASN1Template recode_message_template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(cms_recode_message) },
+                                                     { SEC_ASN1_ANY, offsetof(cms_recode_message, contentType), nullptr, 0 },
+                                                     { SEC_ASN1_EXPLICIT | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(cms_recode_message, signedData), recode_signed_data_template, 0 },
+                                                     { 0, 0, nullptr, 0 } };
 
 static NSSCMSMessage *CMS_MessageCreate(SECItem *cms_item);
 static NSSCMSSignedData *CMS_SignedDataCreate(NSSCMSMessage *cms_msg);
@@ -240,6 +323,8 @@ static void shutdownNss()
 //
 // 1.2.840.113549.1.9.16.2.47
 constexpr unsigned char OID_SIGNINGCERTIFICATEV2[] { 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x2f };
+// 1.2.840.113549.1.9.16.2.14
+constexpr unsigned char OID_TIMESTAMPTOKEN[] { 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x09, 0x10, 0x02, 0x0e };
 
 static NSSCMSAttribute *my_NSS_CMSAttributeArray_FindAttrByOidTag(NSSCMSAttribute **attrs, SECOidTag oidtag, PRBool only)
 {
@@ -474,6 +559,17 @@ std::chrono::system_clock::time_point NSSSignatureVerification::getSigningTime()
     }
     PRTime sTime; // time in microseconds since the epoch
 
+    if (type == CryptoSign::SignatureType::ETSI_RFC3161) {
+        // DER_GeneralizedTimeToTime() from NSS does not support fractional seconds
+        // explicitly allowed by RFC3161 and acutally used by some TSAs
+        std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds> utc_signing_time;
+        const std::string gentime_string = { reinterpret_cast<char *>(timeStamp.genTime.data), timeStamp.genTime.len };
+        std::istringstream gentime_stream { gentime_string };
+        gentime_stream.imbue(std::locale::classic());
+        gentime_stream >> std::chrono::parse("%Y%m%d%H%M%S", utc_signing_time);
+        return utc_signing_time;
+    }
+
     if (NSS_CMSSignerInfo_GetSigningTime(CMSSignerInfo, &sTime) != SECSuccess) {
         return {};
     }
@@ -700,7 +796,8 @@ void NSSSignatureConfiguration::setNSSPasswordCallback(const std::function<char 
     PasswordFunction = f;
 }
 
-NSSSignatureVerification::NSSSignatureVerification(std::vector<unsigned char> &&p7data, CryptoSign::SignatureType subfilter) : p7(std::move(p7data)), type(subfilter), CMSMessage(nullptr), CMSSignedData(nullptr), CMSSignerInfo(nullptr)
+NSSSignatureVerification::NSSSignatureVerification(std::vector<unsigned char> &&p7data, CryptoSign::SignatureType subfilter)
+    : p7(std::move(p7data)), type(subfilter), CMSMessage(nullptr), CMSSignedData(nullptr), CMSSignerInfo(nullptr), timeStamp(), arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE))
 {
     NSSSignatureConfiguration::setNSSDir({});
     CMSitem.data = p7.data();
@@ -714,6 +811,15 @@ NSSSignatureVerification::NSSSignatureVerification(std::vector<unsigned char> &&
 
     if (type == CryptoSign::SignatureType::adbe_pkcs7_sha1) {
         hashContext = HashContext::create(HashAlgorithm::Sha1);
+        return;
+    }
+
+    if (type == CryptoSign::SignatureType::ETSI_RFC3161) {
+        if (CMSSignedData->contentInfo.rawContent && SEC_ASN1DecodeItem(arena.get(), &timeStamp, TSTInfo_Template, CMSSignedData->contentInfo.rawContent) == SECSuccess) {
+            SECItem usedAlgorithm = timeStamp.messageImprint.hashAlgorithm.algorithm;
+            HASH_HashType hashType = HASH_GetHashTypeByOidTag(SECOID_FindOIDTag(&usedAlgorithm));
+            hashContext = HashContext::create(ConvertHashTypeFromNss(hashType));
+        }
         return;
     }
 
@@ -731,7 +837,8 @@ NSSSignatureVerification::NSSSignatureVerification(std::vector<unsigned char> &&
     }
 }
 
-NSSSignatureCreation::NSSSignatureCreation(const std::string &certNickname, HashAlgorithm digestAlgTag) : hashContext(HashContext::create(digestAlgTag)), signing_cert(nullptr)
+NSSSignatureCreation::NSSSignatureCreation(const std::string &certNickname, HashAlgorithm digestAlgTag, const std::string &timestampServer)
+    : hashContext(HashContext::create(digestAlgTag)), signing_cert(nullptr), arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE)), timestamp_server(timestampServer)
 {
     NSSSignatureConfiguration::setNSSDir({});
     signing_cert = CERT_FindCertByNickname(CERT_GetDefaultCertDB(), certNickname.c_str());
@@ -911,6 +1018,19 @@ SignatureValidationStatus NSSSignatureVerification::validateSignature()
         digest = *CMSSignedData->digests[0];
     }
 
+    if (type == CryptoSign::SignatureType::ETSI_RFC3161) {
+        if (SECITEM_CompareItem(&digest, &timeStamp.messageImprint.hashedMessage) != SECEqual) {
+            return SIGNATURE_DIGEST_MISMATCH;
+        }
+        if (!CMSSignedData->digests || !*CMSSignedData->digests) {
+            return SIGNATURE_INVALID;
+        }
+        if (SECOID_CompareAlgorithmID(&CMSSignerInfo->digestAlg, *CMSSignedData->digestAlgorithms) != SECEqual) {
+            return SIGNATURE_INVALID;
+        }
+        digest = *CMSSignedData->digests[0];
+    }
+
     if (NSS_CMSSignerInfo_Verify(CMSSignerInfo, &digest, nullptr) != SECSuccess) {
         return NSS_SigTranslate(CMSSignerInfo->verificationStatus);
     } else {
@@ -1018,6 +1138,15 @@ std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> NSSSig
     digest.data = digest_buffer.data();
     digest.len = digest_buffer.size();
 
+    if (!signing_cert && !timestamp_server.empty()) {
+        auto timestamp_result = fetchTimestamp(digest_buffer, hashContext->getHashAlgorithm());
+        if (std::holds_alternative<CryptoSign::SigningErrorMessage>(timestamp_result)) {
+            return std::get<CryptoSign::SigningErrorMessage>(timestamp_result);
+        }
+        auto timestamp = std::get<SECItem>(timestamp_result);
+        return std::vector<unsigned char> { timestamp.data, timestamp.data + timestamp.len };
+    }
+
     /////////////////////////////////////
     /// Code from LibreOffice under MPLv2
     /////////////////////////////////////
@@ -1066,12 +1195,6 @@ std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> NSSSig
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
     }
 
-    struct PLArenaFreeFalse
-    {
-        void operator()(PLArenaPool *arena) { PORT_FreeArena(arena, PR_FALSE); }
-    };
-    std::unique_ptr<PLArenaPool, PLArenaFreeFalse> arena { PORT_NewArena(CryptoSign::maxSupportedSignatureSize) };
-
     // Add the signing certificate as a signed attribute.
     ESSCertIDv2 *aCertIDs[2];
     ESSCertIDv2 aCertID;
@@ -1106,7 +1229,7 @@ std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> NSSSig
     SigningCertificateV2 aCertificate;
     aCertificate.certs = &aCertIDs[0];
 
-    SECItem *pEncodedCertificate = SEC_ASN1EncodeItem(nullptr, nullptr, &aCertificate, SigningCertificateV2Template);
+    SECItem *pEncodedCertificate = SEC_ASN1EncodeItem(arena.get(), nullptr, &aCertificate, SigningCertificateV2Template);
     if (!pEncodedCertificate) {
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
     }
@@ -1158,11 +1281,212 @@ std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> NSSSig
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
     }
 
-    auto signature = std::vector<unsigned char>(cms_output.data, cms_output.data + cms_output.len);
+    if (timestamp_server.empty()) {
+        auto signature = std::vector<unsigned char>(cms_output.data, cms_output.data + cms_output.len);
+        return signature;
+    }
 
-    SECITEM_FreeItem(pEncodedCertificate, PR_TRUE);
+    const auto timestamp_digest_alg = hashContext->getHashAlgorithm();
+    auto timestamp_hash_context = HashContext::create(timestamp_digest_alg);
+    timestamp_hash_context->updateHash(cms_signer->encDigest.data, cms_signer->encDigest.len);
+    auto data_to_timestamp = timestamp_hash_context->endHash();
 
-    return signature;
+    auto timestamping_result = fetchTimestamp(data_to_timestamp, timestamp_digest_alg);
+
+    if (std::holds_alternative<CryptoSign::SigningErrorMessage>(timestamping_result)) {
+        return std::get<CryptoSign::SigningErrorMessage>(timestamping_result);
+    }
+    const auto timestamp = std::get<SECItem>(timestamping_result);
+    return addTimestampAttribute(&cms_output, &timestamp);
+}
+
+std::variant<SECItem, CryptoSign::SigningErrorMessage> NSSSignatureCreation::fetchTimestamp(std::span<unsigned char> messageImprint, const HashAlgorithm algorithm)
+{
+#ifdef ENABLE_LIBCURL
+    if (!arena) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    unsigned char nonce_buf[16];
+    if (PK11_GenerateRandom(nonce_buf, std::size(nonce_buf)) != SECSuccess) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    TimeStampReq request {};
+    request.nonce = { siBuffer, nonce_buf, std::size(nonce_buf) };
+
+    unsigned char version_buf[] { 1 };
+    request.version = { siBuffer, version_buf, std::size(version_buf) };
+
+    unsigned char certreq_buf[] { 0xFF };
+    request.certReq = { siBuffer, certreq_buf, std::size(certreq_buf) };
+
+    request.messageImprint.hashedMessage = { siBuffer, messageImprint.data(), static_cast<unsigned int>(messageImprint.size()) };
+    SECOID_SetAlgorithmID(arena.get(), &request.messageImprint.hashAlgorithm, ConvertHashAlgorithmToNss(algorithm), nullptr);
+
+    SECItem *encoded_request = SEC_ASN1EncodeItem(arena.get(), nullptr, &request, TimeStampReq_Template);
+
+    if (!encoded_request) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    auto curl_deleter = [](CURL *raw_curl) { curl_easy_cleanup(raw_curl); };
+    std::unique_ptr<CURL, decltype(curl_deleter)> curl { curl_easy_init() };
+
+    if (!curl) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    auto raw_slist = curl_slist_append(nullptr, "Content-Type: application/timestamp-query");
+    raw_slist = curl_slist_append(raw_slist, "Accept: application/timestamp-reply");
+
+    auto slist_deleter = [](curl_slist *raw) { curl_slist_free_all(raw); };
+    std::unique_ptr<curl_slist, decltype(slist_deleter)> slist { raw_slist };
+
+    std::vector<char> response {};
+
+    auto write_function = +[](const char *ptr, size_t size, size_t nmemb, std::vector<char> *userdata) {
+        userdata->insert(userdata->end(), ptr, ptr + size * nmemb);
+        return size * nmemb;
+    };
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_URL, timestamp_server.c_str()) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, slist.get()) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_POST, 1) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, encoded_request->data) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, encoded_request->len) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &response) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, write_function) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_setopt(curl.get(), CURLOPT_MAXFILESIZE, static_cast<long>(CryptoSign::maxSupportedTimestampSize)) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (curl_easy_perform(curl.get()) != CURLE_OK) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    TimeStampResp decoded_response {};
+    if (SEC_ASN1Decode(arena.get(), &decoded_response, TimeStampResp_Template, response.data(), response.size()) != SECSuccess) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (decoded_response.status.status.len != 1 || (decoded_response.status.status.data[0] != 0 && decoded_response.status.status.data[0] != 1)) {
+        // request not granted
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    auto cmsg_deleter = [](NSSCMSMessage *raw_message) { NSS_CMSMessage_Destroy(raw_message); };
+    std::unique_ptr<NSSCMSMessage, decltype(cmsg_deleter)> cmsg { NSS_CMSMessage_CreateFromDER(&decoded_response.timeStampToken, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr) };
+
+    if (!cmsg) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    auto encoded_tstinfo = NSS_CMSMessage_ContentLevel(cmsg.get(), 1);
+    if (!encoded_tstinfo) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    TSTInfo decoded_tstinfo {};
+    if (SEC_ASN1DecodeItem(arena.get(), &decoded_tstinfo, TSTInfo_Template, encoded_tstinfo->rawContent) != SECSuccess) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (SECITEM_CompareItem(&request.nonce, &decoded_tstinfo.nonce) != SECEqual) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (SECOID_CompareAlgorithmID(&request.messageImprint.hashAlgorithm, &decoded_tstinfo.messageImprint.hashAlgorithm) != SECEqual) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (SECITEM_CompareItem(&request.messageImprint.hashedMessage, &decoded_tstinfo.messageImprint.hashedMessage) != SECEqual) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
+    // the returned SECItem points to memory allocated by us, but managed by the arena
+    return decoded_response.timeStampToken;
+#else
+    return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+#endif
+}
+
+std::variant<std::vector<unsigned char>, CryptoSign::SigningErrorMessage> NSSSignatureCreation::addTimestampAttribute(const SECItem *encodedSignature, const SECItem *timestampToken)
+{
+    cms_recode_message decoded_signature {};
+    cms_recode_attribute timestamp;
+
+    SECItem values[2];
+    SECItem *valuesp[2];
+    valuesp[0] = values;
+    valuesp[1] = nullptr;
+    values[0] = *timestampToken;
+    values[1] = { siBuffer, nullptr, 0 };
+
+    timestamp.values = valuesp;
+
+    auto ts_oid_buffer = std::to_array(OID_TIMESTAMPTOKEN);
+    timestamp.type.data = ts_oid_buffer.data();
+    timestamp.type.len = ts_oid_buffer.size();
+
+    if (!arena) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
+    }
+
+    if (SEC_ASN1DecodeItem(arena.get(), &decoded_signature, recode_message_template, encodedSignature) != SECSuccess) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
+    }
+
+    // now insert the new attribute
+    cms_recode_signer_info **decoded_signerinfos = decoded_signature.signedData.signerInfos;
+    if (!decoded_signerinfos || !*decoded_signerinfos) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
+    }
+
+    std::vector<cms_recode_attribute *> updated_attrs;
+
+    // there are no unauthenticated attributes at the moment
+    // if this ever changes, make sure to preserve them
+    cms_recode_attribute **existing_attrs = (*decoded_signerinfos)->unAuthAttr;
+
+    if (existing_attrs) {
+        while (*existing_attrs) {
+            updated_attrs.push_back(*existing_attrs++);
+        }
+    }
+
+    updated_attrs.push_back(&timestamp);
+    updated_attrs.push_back(nullptr);
+
+    (*decoded_signerinfos)->unAuthAttr = updated_attrs.data();
+
+    SECItem *updated_signature = SEC_ASN1EncodeItem(arena.get(), nullptr, &decoded_signature, recode_message_template);
+    if (!updated_signature) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::GenericError, ERROR_IN_CODE_LOCATION };
+    }
+
+    return std::vector(updated_signature->data, updated_signature->data + updated_signature->len);
 }
 
 static char *GetPasswordFunction(PK11SlotInfo *slot, PRBool /*retry*/, void * /*arg*/)
@@ -1184,14 +1508,15 @@ std::unique_ptr<CryptoSign::VerificationInterface> NSSCryptoSignBackend::createV
     case CryptoSign::SignatureType::ETSI_CAdES_detached:
     case CryptoSign::SignatureType::adbe_pkcs7_detached:
     case CryptoSign::SignatureType::adbe_pkcs7_sha1:
+    case CryptoSign::SignatureType::ETSI_RFC3161:
         return std::make_unique<NSSSignatureVerification>(std::move(pkcs7), type);
     }
     return {};
 }
 
-std::unique_ptr<CryptoSign::SigningInterface> NSSCryptoSignBackend::createSigningHandler(const std::string &certID, HashAlgorithm digestAlgTag)
+std::unique_ptr<CryptoSign::SigningInterface> NSSCryptoSignBackend::createSigningHandler(const std::string &certID, HashAlgorithm digestAlgTag, const std::string &timestampServer)
 {
-    return std::make_unique<NSSSignatureCreation>(certID, digestAlgTag);
+    return std::make_unique<NSSSignatureCreation>(certID, digestAlgTag, timestampServer);
 }
 
 std::vector<std::unique_ptr<X509CertificateInfo>> NSSCryptoSignBackend::getAvailableSigningCertificates()
@@ -1267,6 +1592,14 @@ std::unique_ptr<HashContext> HashContext::create(HashAlgorithm algorithm)
 HashAlgorithm HashContext::getHashAlgorithm() const
 {
     return digest_alg_tag;
+}
+
+CryptoSign::SignatureType NSSSignatureCreation::signatureType() const
+{
+    if (!signing_cert && !timestamp_server.empty()) {
+        return CryptoSign::SignatureType::ETSI_RFC3161;
+    }
+    return CryptoSign::SignatureType::adbe_pkcs7_detached;
 }
 
 NSSCryptoSignBackend::~NSSCryptoSignBackend() = default;

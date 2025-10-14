@@ -28,6 +28,8 @@ SignatureType signatureTypeFromString(std::string_view data)
         return CryptoSign::SignatureType::adbe_pkcs7_sha1;
     } else if (data == std::string_view("g10c.pgp.signature.detached")) {
         return CryptoSign::SignatureType::g10c_pgp_signature_detached;
+    } else if (data == std::string_view("ETSI.RFC3161")) {
+        return CryptoSign::SignatureType::ETSI_RFC3161;
     }
     return CryptoSign::SignatureType::unknown_signature_type;
 }
@@ -41,6 +43,8 @@ std::string toStdString(SignatureType type)
         return "Unknown";
     case CryptoSign::SignatureType::ETSI_CAdES_detached:
         return "ETSI.CAdES.detached";
+    case CryptoSign::SignatureType::ETSI_RFC3161:
+        return "ETSI.RFC3161";
     case CryptoSign::SignatureType::adbe_pkcs7_detached:
         return "adbe.pkcs7.detached";
     case CryptoSign::SignatureType::adbe_pkcs7_sha1:

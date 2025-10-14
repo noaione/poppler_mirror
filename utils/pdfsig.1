@@ -72,6 +72,12 @@ Sign the document in the specified signature field present in the document (must
 .B \-nick " nickname"
 Use the certificate with the given nickname for signing (NSS backend). If nickname starts with pkcs11:, it's treated as PKCS#11 URI (NSS backend). If the nickname is given as a fingerprint, it will be the certificate used (GPG backend)
 .TP
+.B \-timestamp-server " URL"
+URL to fetch a RFC3161 timestamp from. Timestamps the new signature if combined with -add-signature or -sign. (NSS backend)
+.TP
+.B \-add-document-timestamp
+Add a ETSI.RFC3161 document timestamp. Requires timestamp server URL to be set. (NSS backend)
+.TP
 .B \-backend " backend"
 Use the specified backeng for cryptographic signatures
 .TP
@@ -119,6 +125,9 @@ Same, but uses a PKCS#11 URI as defined in IETF RFC 7512 to select the certifica
 .TP
 pdfsig input.pdf output.pdf -sign 0 -nss-pwd password -nick my-cert -reason 'for fun!'
 Creates a new pdf named output.pdf with the contents of input.pdf signed by the 'my-cert' certificate. input.pdf must have an already existing un-signed signature field.
+.TP
+pdfsig input.pdf output.pdf -add-document-timestamp -timestamp-server http://tsa.example.com/
+Creates a new pdf named output.pdf by adding a document timestamp obtained from http://tsa.example.com/ to input.pdf.
 .SH AUTHOR
 The pdfsig software and documentation are copyright 1996-2004 Glyph & Cog, LLC
 and copyright 2005-2015 The Poppler Developers - http://poppler.freedesktop.org
