@@ -97,7 +97,6 @@ private:
     NSSCMSSignerInfo *CMSSignerInfo;
     SECItem CMSitem;
     std::unique_ptr<HashContext> hashContext;
-    HashAlgorithm innerHashAlgorithm;
     std::future<CertificateValidationStatus> validationStatus;
     std::optional<CertificateValidationStatus> cachedValidationStatus;
 };

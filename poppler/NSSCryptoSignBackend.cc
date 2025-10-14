@@ -707,22 +707,27 @@ NSSSignatureVerification::NSSSignatureVerification(std::vector<unsigned char> &&
     CMSitem.len = p7.size();
     CMSMessage = CMS_MessageCreate(&CMSitem);
     CMSSignedData = CMS_SignedDataCreate(CMSMessage);
-    if (CMSSignedData) {
-        CMSSignerInfo = CMS_SignerInfoCreate(CMSSignedData);
-        SECAlgorithmID **algs = NSS_CMSSignedData_GetDigestAlgs(CMSSignedData);
-        while (*algs != nullptr) {
-            SECItem usedAlgorithm = (*algs)->algorithm;
-            auto hashAlgorithm = SECOID_FindOIDTag(&usedAlgorithm);
-            HASH_HashType hashType = HASH_GetHashTypeByOidTag(hashAlgorithm);
-            innerHashAlgorithm = ConvertHashTypeFromNss(hashType);
-            auto outerHashAlgorithm = (type == CryptoSign::SignatureType::adbe_pkcs7_sha1) ? HashAlgorithm::Sha1 : innerHashAlgorithm;
-            hashContext = HashContext::create(outerHashAlgorithm);
+    if (!CMSSignedData) {
+        return;
+    }
+    CMSSignerInfo = CMS_SignerInfoCreate(CMSSignedData);
 
-            if (hashContext) {
-                break;
-            }
-            ++algs;
+    if (type == CryptoSign::SignatureType::adbe_pkcs7_sha1) {
+        hashContext = HashContext::create(HashAlgorithm::Sha1);
+        return;
+    }
+
+    SECAlgorithmID **algs = NSS_CMSSignedData_GetDigestAlgs(CMSSignedData);
+    while (*algs != nullptr) {
+        SECItem usedAlgorithm = (*algs)->algorithm;
+        auto hashAlgorithm = SECOID_FindOIDTag(&usedAlgorithm);
+        HASH_HashType hashType = HASH_GetHashTypeByOidTag(hashAlgorithm);
+        hashContext = HashContext::create(ConvertHashTypeFromNss(hashType));
+
+        if (hashContext) {
+            break;
         }
+        ++algs;
     }
 }
 
@@ -894,15 +899,16 @@ SignatureValidationStatus NSSSignatureVerification::validateSignature()
           This means it's not a detached type signature
           so the digest is contained in SignedData->contentInfo
         */
-        if (digest.len != content_info_data->len || memcmp(digest.data, content_info_data->data, digest.len) != 0) {
+        if (SECITEM_CompareItem(&digest, content_info_data) != SECEqual) {
             return SIGNATURE_DIGEST_MISMATCH;
         }
-
-        auto innerHashContext = HashContext::create(innerHashAlgorithm);
-        innerHashContext->updateHash(content_info_data->data, content_info_data->len);
-        digest_buffer = innerHashContext->endHash();
-        digest.data = digest_buffer.data();
-        digest.len = digest_buffer.size();
+        if (!CMSSignedData->digests || !*CMSSignedData->digests) {
+            return SIGNATURE_INVALID;
+        }
+        if (SECOID_CompareAlgorithmID(&CMSSignerInfo->digestAlg, *CMSSignedData->digestAlgorithms) != SECEqual) {
+            return SIGNATURE_INVALID;
+        }
+        digest = *CMSSignedData->digests[0];
     }
 
     if (NSS_CMSSignerInfo_Verify(CMSSignerInfo, &digest, nullptr) != SECSuccess) {
