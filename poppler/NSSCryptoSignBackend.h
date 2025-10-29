@@ -68,6 +68,8 @@ struct TSTInfo
     Accuracy accuracy;
     SECItem ordering;
     SECItem nonce;
+    SECItem tsa;
+    SECItem **extensions;
 };
 
 struct PLArenaFreeFalse

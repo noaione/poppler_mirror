@@ -216,7 +216,8 @@ const SEC_ASN1Template TSTInfo_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, s
                                               { SEC_ASN1_OPTIONAL | SEC_ASN1_INLINE, offsetof(TSTInfo, accuracy), Accuracy_Template, 0 },
                                               { SEC_ASN1_BOOLEAN | SEC_ASN1_OPTIONAL, offsetof(TSTInfo, ordering), nullptr, 0 },
                                               { SEC_ASN1_INTEGER | SEC_ASN1_OPTIONAL, offsetof(TSTInfo, nonce), nullptr, 0 },
-                                              { SEC_ASN1_SKIP_REST, 0, nullptr, 0 },
+                                              { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(TSTInfo, tsa), SEC_AnyTemplate, 0 },
+                                              { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_CONTEXT_SPECIFIC | 1, offsetof(TSTInfo, extensions), SEC_SequenceOfAnyTemplate, 0 },
                                               { 0, 0, nullptr, 0 } };
 
 struct cms_recode_attribute
