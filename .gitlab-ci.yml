@@ -119,7 +119,7 @@ build_clazy_fedora43:
   script:
     - mkdir -p build && cd build
     - CC=clang-21 CXX=clazy CXXFLAGS="-Werror -Wno-deprecated-declarations" cmake -G Ninja ..
-    - CLAZY_CHECKS="level0,level1,level2,isempty-vs-count,qhash-with-char-pointer-key,tr-non-literal,no-non-pod-global-static" ninja -j ${FDO_CI_CONCURRENT}
+    - CLAZY_CHECKS="level0,level1,level2,isempty-vs-count,qhash-with-char-pointer-key,tr-non-literal,no-non-pod-global-static,no-function-args-by-ref" ninja -j ${FDO_CI_CONCURRENT}
 
 build_qt69_android:
   stage: build

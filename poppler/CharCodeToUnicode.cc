@@ -124,7 +124,7 @@ std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::makeIdentityMapping()
     return ctu;
 }
 
-std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::parseCIDToUnicode(const char *fileName, const std::string &collection)
+std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::parseCIDToUnicode(const char *fileName, std::string_view collection)
 {
     FILE *f;
     CharCode size;
@@ -176,7 +176,7 @@ std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::parseCMap(const std::strin
     return ctu;
 }
 
-std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::parseCMapFromFile(const std::string &fileName, int nBits)
+std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::parseCMapFromFile(std::string_view fileName, int nBits)
 {
     FILE *f;
 
@@ -187,7 +187,8 @@ std::unique_ptr<CharCodeToUnicode> CharCodeToUnicode::parseCMapFromFile(const st
             return nullptr;
         }
     } else {
-        error(errSyntaxError, -1, "Couldn't find ToUnicode CMap file for '{0:s}'", fileName.c_str());
+        GooString errFileName(fileName);
+        error(errSyntaxError, -1, "Couldn't find ToUnicode CMap file for '{0:t}'", &errFileName);
     }
     return ctu;
 }
@@ -446,19 +447,20 @@ CharCodeToUnicode::CharCodeToUnicode(PrivateTag)
     isIdentity = false;
 }
 
-CharCodeToUnicode::CharCodeToUnicode(const std::optional<std::string> &tagA, PrivateTag) : tag(tagA)
+CharCodeToUnicode::CharCodeToUnicode(const std::optional<std::string_view> &tagA, PrivateTag) : tag(tagA ? std::optional<std::string>(*tagA) : std::optional<std::string>())
 {
     map.resize(256, 0);
     isIdentity = false;
 }
-CharCodeToUnicode::CharCodeToUnicode(const std::optional<std::string> &tagA, std::vector<Unicode> &&mapA, std::vector<CharCodeToUnicodeString> &&sMapA, PrivateTag) : tag(tagA)
+CharCodeToUnicode::CharCodeToUnicode(const std::optional<std::string_view> &tagA, std::vector<Unicode> &&mapA, std::vector<CharCodeToUnicodeString> &&sMapA, PrivateTag)
+    : tag(tagA ? std::optional<std::string>(*tagA) : std::optional<std::string>())
 {
     map = std::move(mapA);
     sMap = std::move(sMapA);
     isIdentity = false;
 }
 
-bool CharCodeToUnicode::match(const std::string &tagA)
+bool CharCodeToUnicode::match(std::string_view tagA)
 {
     return tag && tag == tagA;
 }
@@ -570,7 +572,7 @@ CharCodeToUnicodeCache::CharCodeToUnicodeCache(int sizeA) : size(sizeA) { }
 
 CharCodeToUnicodeCache::~CharCodeToUnicodeCache() = default;
 
-std::shared_ptr<CharCodeToUnicode> CharCodeToUnicodeCache::getCharCodeToUnicode(const std::string &tag)
+std::shared_ptr<CharCodeToUnicode> CharCodeToUnicodeCache::getCharCodeToUnicode(std::string_view tag)
 {
     for (auto it = cache.begin(); it != cache.end(); ++it) {
         if ((*it)->match(tag)) {

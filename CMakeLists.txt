@@ -520,7 +520,7 @@ if(FONTCONFIG_FOUND)
   set(PC_REQUIRES_PRIVATE "${PC_REQUIRES_PRIVATE} fontconfig >= ${FONTCONFIG_VERSION}")
 endif()
 
-if(Androidlib) 
+if(Androidlib)
   set(poppler_LIBS ${poppler_LIBS} ${Androidlib})
   set(PC_LIBS_PRIVATE "${PC_LIBS_PRIVATE} ${Androidlib}")
 endif()
@@ -754,6 +754,7 @@ if(ENABLE_UNSTABLE_API_ABI_HEADERS)
   set(poppler_goo_installed_headers
     goo/GooTimer.h
     goo/GooString.h
+    goo/string_view.h
     goo/gmem.h
     goo/gfile.h
     goo/ImgWriter.h
@@ -862,7 +863,7 @@ function(VERIFY_PUBLIC_HEADERS target subfolder)
        "${CMAKE_CURRENT_BINARY_DIR}/public_if_test/${target}/${_name}.cpp")
   endforeach()
   add_library(test_public_interface_${target} MODULE ${_gen_source_files})
-  target_include_directories(test_public_interface_${target} PRIVATE 
+  target_include_directories(test_public_interface_${target} PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}
       ${CMAKE_CURRENT_BINARY_DIR}/poppler
       ${CMAKE_CURRENT_BINARY_DIR}/public_if_test/goo
@@ -874,7 +875,7 @@ function(VERIFY_PUBLIC_HEADERS target subfolder)
 endfunction()
 
 # Create a build target to check if the '*_public.h' files are self contained
-if(UNIX AND VERIFY_PUBLIC_PRIVATE_HEADERS) 
+if(UNIX AND VERIFY_PUBLIC_PRIVATE_HEADERS)
   VERIFY_PUBLIC_HEADERS(goo goo ${poppler_goo_installed_headers})
   VERIFY_PUBLIC_HEADERS(fofi fofi ${poppler_fofi_installed_headers})
   VERIFY_PUBLIC_HEADERS(splash splash ${poppler_splash_installed_headers})

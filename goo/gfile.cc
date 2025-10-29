@@ -95,17 +95,16 @@ inline const struct timespec &mtim(const struct stat &stbuf)
 
 //------------------------------------------------------------------------
 
-GooString *appendToPath(GooString *path, const char *fileName)
+GooString *appendToPath(GooString *path, std::string_view fileName)
 {
 #ifdef _WIN32
     //---------- Win32 ----------
     char buf[256];
     char *fp;
 
-    auto tmp = path->copy();
-    tmp->append('/');
-    tmp->append(fileName);
-    GetFullPathNameA(tmp->c_str(), sizeof(buf), buf, &fp);
+    path->append('/');
+    path->append(fileName);
+    GetFullPathNameA(path->c_str(), sizeof(buf), buf, &fp);
     path->clear();
     path->append(buf);
     return path;
@@ -115,12 +114,12 @@ GooString *appendToPath(GooString *path, const char *fileName)
     int i;
 
     // appending "." does nothing
-    if (!strcmp(fileName, ".")) {
+    if (fileName == ".") {
         return path;
     }
 
     // appending ".." goes up one directory
-    if (!strcmp(fileName, "..")) {
+    if (fileName == "..") {
         for (i = path->size() - 2; i >= 0; --i) {
             if (path->getChar(i) == '/') {
                 break;

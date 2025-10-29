@@ -25,6 +25,8 @@
 #define NAMETOCHARCODE_H
 
 #include "CharTypes.h"
+#include "goo/string_view.h"
+
 #include <unordered_map>
 #include <string>
 
@@ -35,19 +37,11 @@ struct NameToCharCodeEntry;
 class NameToCharCode
 {
 public:
-    void add(const char *name, CharCode c);
-    CharCode lookup(const char *name) const;
+    void add(std::string_view name, CharCode c);
+    CharCode lookup(std::string_view name) const;
 
 private:
-    /*This is a helper struct to allow looking up by char* into a std string unordered_map*/
-    struct string_hasher
-    {
-        using is_transparent = void;
-        [[nodiscard]] size_t operator()(const char *txt) const { return std::hash<std::string_view> {}(txt); }
-        [[nodiscard]] size_t operator()(const std::string &txt) const { return std::hash<std::string> {}(txt); }
-    };
-
-    std::unordered_map<std::string, CharCode, string_hasher, std::equal_to<>> tab;
+    std::unordered_map<std::string, CharCode, string_hash, std::equal_to<>> tab;
 };
 
 #endif

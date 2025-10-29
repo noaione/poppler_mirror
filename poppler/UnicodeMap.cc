@@ -46,7 +46,7 @@ inline constexpr bool always_false_v = false;
 
 //------------------------------------------------------------------------
 
-std::unique_ptr<UnicodeMap> UnicodeMap::parse(const std::string &encodingNameA)
+std::unique_ptr<UnicodeMap> UnicodeMap::parse(std::string_view encodingNameA)
 {
     FILE *f;
     char buf[256];
@@ -55,7 +55,8 @@ std::unique_ptr<UnicodeMap> UnicodeMap::parse(const std::string &encodingNameA)
     char *tokptr;
 
     if (!(f = globalParams->getUnicodeMapFile(encodingNameA))) {
-        error(errSyntaxError, -1, "Couldn't find unicodeMap file for the '{0:s}' encoding", encodingNameA.c_str());
+        GooString errEncodingName(encodingNameA);
+        error(errSyntaxError, -1, "Couldn't find unicodeMap file for the '{0:t}' encoding", &errEncodingName);
         return {};
     }
 
@@ -90,10 +91,12 @@ std::unique_ptr<UnicodeMap> UnicodeMap::parse(const std::string &encodingNameA)
                 }
                 eMap.push_back(std::move(ext));
             } else {
-                error(errSyntaxError, -1, "Bad line ({0:d}) in unicodeMap file for the '{1:s}' encoding", line, encodingNameA.c_str());
+                GooString errEncodingName(encodingNameA);
+                error(errSyntaxError, -1, "Bad line ({0:d}) in unicodeMap file for the '{1:t}' encoding", line, &errEncodingName);
             }
         } else {
-            error(errSyntaxError, -1, "Bad line ({0:d}) in unicodeMap file for the '{1:s}' encoding", line, encodingNameA.c_str());
+            GooString errEncodingName(encodingNameA);
+            error(errSyntaxError, -1, "Bad line ({0:d}) in unicodeMap file for the '{1:t}' encoding", line, &errEncodingName);
         }
         ++line;
     }
@@ -105,25 +108,11 @@ std::unique_ptr<UnicodeMap> UnicodeMap::parse(const std::string &encodingNameA)
     return map;
 }
 
-UnicodeMap::UnicodeMap(const std::string &encodingNameA)
-{
-    encodingName = encodingNameA;
-    unicodeOut = false;
-}
+UnicodeMap::UnicodeMap(std::string_view encodingNameA) : encodingName(encodingNameA), unicodeOut(false) { }
 
-UnicodeMap::UnicodeMap(const char *encodingNameA, bool unicodeOutA, std::span<const UnicodeMapRange> rangesA)
-{
-    encodingName = encodingNameA;
-    unicodeOut = unicodeOutA;
-    data = rangesA;
-}
+UnicodeMap::UnicodeMap(std::string_view encodingNameA, bool unicodeOutA, std::span<const UnicodeMapRange> rangesA) : encodingName(encodingNameA), unicodeOut(unicodeOutA), data(rangesA) { }
 
-UnicodeMap::UnicodeMap(const char *encodingNameA, bool unicodeOutA, UnicodeMapFunc funcA)
-{
-    encodingName = encodingNameA;
-    unicodeOut = unicodeOutA;
-    data = funcA;
-}
+UnicodeMap::UnicodeMap(std::string_view encodingNameA, bool unicodeOutA, UnicodeMapFunc funcA) : encodingName(encodingNameA), unicodeOut(unicodeOutA), data(funcA) { }
 
 UnicodeMap::~UnicodeMap() = default;
 
@@ -146,7 +135,7 @@ void UnicodeMap::swap(UnicodeMap &other) noexcept
     swap(eMaps, other.eMaps);
 }
 
-bool UnicodeMap::match(const std::string &encodingNameA) const
+bool UnicodeMap::match(std::string_view encodingNameA) const
 {
     return encodingName == encodingNameA;
 }
@@ -208,7 +197,7 @@ int UnicodeMap::mapUnicode(Unicode u, char *buf, int bufSize) const
 
 UnicodeMapCache::UnicodeMapCache() = default;
 
-const UnicodeMap *UnicodeMapCache::getUnicodeMap(const std::string &encodingName)
+const UnicodeMap *UnicodeMapCache::getUnicodeMap(std::string_view encodingName)
 {
     for (const std::unique_ptr<UnicodeMap> &map : cache) {
         if (map->match(encodingName)) {
