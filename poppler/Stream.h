@@ -694,7 +694,7 @@ public:
 
     [[nodiscard]] bool reset() override
     {
-        bufPtr = buf + start;
+        memPtr = mem + start;
         purgeBuffer();
         return true;
     }
