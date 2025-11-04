@@ -30,6 +30,7 @@
 #include "NSSCryptoSignBackend.h"
 #include "goo/gmem.h"
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <vector>
@@ -562,16 +563,23 @@ std::chrono::system_clock::time_point NSSSignatureVerification::getSigningTime()
 
     if (type == CryptoSign::SignatureType::ETSI_RFC3161) {
         // DER_GeneralizedTimeToTime() from NSS does not support fractional seconds
-        // explicitly allowed by RFC3161 and acutally used by some TSAs
-        std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds> utc_signing_time;
-        const std::string gentime_string = { reinterpret_cast<char *>(timeStamp.genTime.data), timeStamp.genTime.len };
-        std::istringstream gentime_stream { gentime_string };
-        gentime_stream.imbue(std::locale::classic());
-        gentime_stream >> std::chrono::parse("%Y%m%d%H%M%S", utc_signing_time);
-        return utc_signing_time;
-    }
-
-    if (NSS_CMSSignerInfo_GetSigningTime(CMSSignerInfo, &sTime) != SECSuccess) {
+        // explicitly allowed by RFC3161 and acutally used by some TSAs.
+        // Given we currently do not benefit from the extra accuracy, let us strip the fractional part
+        // and consider std::chrono::parse in the future
+        std::span<const unsigned char> time_to_parse { timeStamp.genTime.data, timeStamp.genTime.len };
+        auto decimal_point = std::ranges::find(time_to_parse, '.');
+        std::vector<unsigned char> integral_time;
+        SECItem si_gentime = timeStamp.genTime;
+        if (decimal_point != time_to_parse.end() && time_to_parse.back() == 'Z') {
+            integral_time = { time_to_parse.begin(), decimal_point };
+            integral_time.push_back('Z');
+            si_gentime.data = integral_time.data();
+            si_gentime.len = integral_time.size();
+        }
+        if (DER_GeneralizedTimeToTime(&sTime, &si_gentime) != SECSuccess) {
+            return {};
+        }
+    } else if (NSS_CMSSignerInfo_GetSigningTime(CMSSignerInfo, &sTime) != SECSuccess) {
         return {};
     }
 
