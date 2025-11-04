@@ -20,6 +20,7 @@ It can also sign PDF documents (options -add-signature or -sign).
 pdfsig uses the trusted certificates stored either in the Network Security Services (NSS) Database or in GnuPG's S/MIME system (gpgsm).
 .PP
 pdfsig also uses the Online Certificate Status Protocol (OCSP) (refer to http://en.wikipedia.org/wiki/Online_Certificate_Status_Protocol) to look up the certificate online and check if it has been revoked (unless -no-ocsp has been specified).
+.PP
 .nr step 0 1
 .nr PI 2n
 If the NSS backend is used, the NSS Database is searched for in the following locations:
