@@ -2144,7 +2144,7 @@ static cairo_surface_t *cairo_surface_create_similar_clip(cairo_t *cairo, cairo_
     return surface;
 }
 
-void CairoOutputDev::beginTransparencyGroup(GfxState * /*state*/, const std::array<double, 4> & /*bbox*/, GfxColorSpace *blendingColorSpace, bool /*isolated*/, bool knockout, bool forSoftMask)
+void CairoOutputDev::beginTransparencyGroup(GfxState * /*state*/, const std::array<double, 4> & /*bbox*/, GfxColorSpace *blendingColorSpace, bool isolated, bool knockout, bool forSoftMask)
 {
     /* push color space */
     ColorSpaceStack *css = new ColorSpaceStack;
@@ -2154,7 +2154,7 @@ void CairoOutputDev::beginTransparencyGroup(GfxState * /*state*/, const std::arr
     css->next = groupColorSpaceStack;
     groupColorSpaceStack = css;
 
-    LOG(printf("begin transparency group. knockout: %s\n", knockout ? "yes" : "no"));
+    LOG(printf("begin transparency group. knockout: %s  isolated: %s\n", knockout ? "yes" : "no", isolated ? "yes" : "no"));
 
     if (knockout) {
         knockoutCount++;
@@ -2180,6 +2180,13 @@ void CairoOutputDev::beginTransparencyGroup(GfxState * /*state*/, const std::arr
         cairo_push_group_with_content(cairo, CAIRO_CONTENT_ALPHA);
     } else {
         cairo_push_group(cairo);
+        if (!isolated) {
+            cairo_save(cairo);
+            cairo_identity_matrix(cairo);
+            cairo_set_source_surface(cairo, cairo_get_target(cairo), 0, 0);
+            cairo_paint(cairo);
+            cairo_restore(cairo);
+        }
     }
 
     /* push_group has an implicit cairo_save() */
