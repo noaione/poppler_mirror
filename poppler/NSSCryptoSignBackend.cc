@@ -1395,6 +1395,11 @@ std::variant<SECItem, CryptoSign::SigningErrorMessage> NSSSignatureCreation::fet
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
     }
 
+    long response_code {};
+    if (curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &response_code) != CURLE_OK || response_code != 200) {
+        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
+    }
+
     TimeStampResp decoded_response {};
     if (SEC_ASN1Decode(arena.get(), &decoded_response, TimeStampResp_Template, response.data(), response.size()) != SECSuccess) {
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::TimestampError, ERROR_IN_CODE_LOCATION };
