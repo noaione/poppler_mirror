@@ -204,8 +204,8 @@ const SEC_ASN1Template TimeStampReq_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullp
 
 const SEC_ASN1Template Accuracy_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(Accuracy) },
                                                { SEC_ASN1_INTEGER | SEC_ASN1_OPTIONAL, offsetof(Accuracy, seconds), nullptr, 0 },
-                                               { SEC_ASN1_INLINE | SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(Accuracy, millis), SEC_IntegerTemplate, 0 },
-                                               { SEC_ASN1_INLINE | SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 1, offsetof(Accuracy, micros), SEC_IntegerTemplate, 0 },
+                                               { SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 0, offsetof(Accuracy, millis), SEC_IntegerTemplate, 0 },
+                                               { SEC_ASN1_OPTIONAL | SEC_ASN1_CONTEXT_SPECIFIC | 1, offsetof(Accuracy, micros), SEC_IntegerTemplate, 0 },
                                                { 0, 0, nullptr, 0 } };
 
 const SEC_ASN1Template TSTInfo_Template[] = { { SEC_ASN1_SEQUENCE, 0, nullptr, sizeof(TSTInfo) },
