@@ -473,9 +473,6 @@ private:
 class FilterStream : public Stream
 {
 public:
-    // Returns either this or a new object (which then owns this FilterStream).
-    Stream *asPredictedStream(int predictor, int columns, int colors, int bits);
-
     explicit FilterStream(Stream *strA);
     ~FilterStream() override;
     void close() override;
@@ -551,9 +548,12 @@ class StreamPredictor : public FilterStream
 public:
     StreamKind getKind() const override { return str->getKind(); }
 
-    // Create a predictor object.  Note that the parameters are for the
-    // predictor, and may not match the actual image parameters.
-    StreamPredictor(Stream *strA, int predictorA, int widthA, int nCompsA, int nBitsA);
+    // Create a predictor object. Note that the parameters are for the
+    // predictor, and may not match the actual image parameters. Takes
+    // ownership of the passed-in str; returns a new StreamPredictor
+    // holding str, or the unfiltered original str if parameters are out
+    // of range.
+    static FilterStream *Wrap(FilterStream *str, int predictor, int width, int nComps, int nBits);
 
     ~StreamPredictor() override;
 
@@ -571,6 +571,8 @@ public:
     Goffset getRawPos() override { return str->getPos(); }
 
 private:
+    StreamPredictor(Stream *strA, int predictorA, int widthA, int nCompsA, int nBitsA, int nValsA);
+
     bool getNextLine();
 
     int predictor; // predictor

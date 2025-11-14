@@ -284,8 +284,8 @@ Stream *Stream::makeFilter(const char *name, Stream *str, Object *params, int re
                 early = obj.getInt();
             }
         }
-        LZWStream *s = new LZWStream(str, columns, colors, bits, early);
-        str = s->asPredictedStream(pred, columns, colors, bits);
+        auto *s = new LZWStream(str, columns, colors, bits, early);
+        str = StreamPredictor::Wrap(s, pred, columns, colors, bits);
     } else if (!strcmp(name, "RunLengthDecode") || !strcmp(name, "RL")) {
         str = new RunLengthStream(str);
     } else if (!strcmp(name, "CCITTFaxDecode") || !strcmp(name, "CCF")) {
@@ -369,8 +369,8 @@ Stream *Stream::makeFilter(const char *name, Stream *str, Object *params, int re
                 bits = obj.getInt();
             }
         }
-        FlateStream *s = new FlateStream(str, columns, colors, bits);
-        str = s->asPredictedStream(pred, columns, colors, bits);
+        auto *s = new FlateStream(str, columns, colors, bits);
+        str = StreamPredictor::Wrap(s, pred, columns, colors, bits);
     } else if (!strcmp(name, "JBIG2Decode")) {
         Object globals;
         if (params->isDict()) {
@@ -543,18 +543,6 @@ void FilterStream::setPos(Goffset pos, int dir)
     error(errInternal, -1, "Internal: called setPos() on FilterStream");
 }
 
-Stream *FilterStream::asPredictedStream(int predictor, int columns, int colors, int bits)
-{
-    if (predictor == 1) {
-        return this;
-    }
-    auto *pred = new StreamPredictor(this, predictor, columns, colors, bits);
-    if (!pred->isOk()) {
-        delete pred;
-        return this;
-    }
-    return pred;
-}
 //------------------------------------------------------------------------
 // ImageStream
 //------------------------------------------------------------------------
@@ -688,28 +676,30 @@ void ImageStream::skipLine()
 // StreamPredictor
 //------------------------------------------------------------------------
 
-StreamPredictor::StreamPredictor(Stream *strA, int predictorA, int widthA, int nCompsA, int nBitsA) : FilterStream(strA)
+FilterStream *StreamPredictor::Wrap(FilterStream *str, int predictor, int width, int nComps, int nBits)
 {
-    predictor = predictorA;
-    width = widthA;
-    nComps = nCompsA;
-    nBits = nBitsA;
-    predLine = nullptr;
-    ok = false;
+    if (predictor == 1) {
+        return str;
+    }
 
+    int nVals = 0;
     if (checkedMultiply(width, nComps, &nVals)) {
-        return;
+        return str;
     }
     if (width <= 0 || nComps <= 0 || nBits <= 0 || nComps > gfxColorMaxComps || nBits > 16 || nVals >= (INT_MAX - 7) / nBits) { // check for overflow in rowBytes
-        return;
+        return str;
     }
+
+    return new StreamPredictor(str, predictor, width, nComps, nBits, nVals);
+}
+
+StreamPredictor::StreamPredictor(Stream *strA, int predictorA, int widthA, int nCompsA, int nBitsA, int nValsA) : FilterStream(strA), predictor(predictorA), width(widthA), nComps(nCompsA), nBits(nBitsA), nVals(nValsA)
+{
     pixBytes = (nComps * nBits + 7) >> 3;
     rowBytes = ((nVals * nBits + 7) >> 3) + pixBytes;
     predLine = (unsigned char *)gmalloc(rowBytes);
     memset(predLine, 0, rowBytes);
     predIdx = rowBytes;
-
-    ok = true;
 }
 
 StreamPredictor::~StreamPredictor()
