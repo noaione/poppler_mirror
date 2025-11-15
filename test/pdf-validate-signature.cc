@@ -15,7 +15,7 @@
 #include "PDFDoc.h"
 #include "PDFDocFactory.h"
 #include "GlobalParams.h"
-#include "CryptoSignBackend.h"
+#include "NSSCryptoSignBackend.h"
 #include "SignatureInfo.h"
 
 using namespace std::string_literals;
@@ -46,6 +46,9 @@ int main(int argc, char *argv[])
     }
 
     CryptoSign::Factory::setPreferredBackend(CryptoSign::Backend::Type::NSS3);
+
+    NSSSignatureConfiguration::setNSSDir({});
+    NSS_SetAlgorithmPolicy(SEC_OID_SHA1, NSS_USE_ALG_IN_SIGNATURE, 0);
 
     const auto signatures = doc->getSignatureFields();
     const auto sigCount = signatures.size();
