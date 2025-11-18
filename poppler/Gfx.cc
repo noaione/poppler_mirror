@@ -4425,6 +4425,7 @@ void Gfx::doImage(Object *ref, Stream *str, bool inlineImg)
         bool haveMaskImage = false;
         haveColorKeyMask = haveExplicitMask = haveSoftMask = false;
         maskStr = nullptr; // make gcc happy
+        maskDict = nullptr; // make gcc happy
         maskWidth = maskHeight = 0; // make gcc happy
         maskInvert = false; // make gcc happy
         std::unique_ptr<GfxImageColorMap> maskColorMap;
