@@ -21,7 +21,6 @@
 #include "Object.h"
 #include "poppler_private_export.h"
 #include <vector>
-#include <set>
 
 class GooString;
 class Dict;
@@ -157,13 +156,17 @@ private:
 
     bool checkType(StructElement *element = nullptr);
     static Type getTypeForName(const char *name, StructElement *element = nullptr);
-    static Attribute *parseUserProperty(Dict *property);
+    static std::unique_ptr<Attribute> parseUserProperty(Dict *property);
 
     friend class StructElement;
 };
 
 class POPPLER_PRIVATE_EXPORT StructElement
 {
+    class PrivateTag
+    {
+    };
+
 public:
     enum Type
     {
@@ -288,24 +291,24 @@ public:
     GooString *getExpandedAbbr() { return isContent() ? nullptr : s->expandedAbbr.get(); }
 
     unsigned getNumChildren() const { return isContent() ? 0 : s->elements.size(); }
-    const StructElement *getChild(int i) const { return isContent() ? nullptr : s->elements.at(i); }
-    StructElement *getChild(int i) { return isContent() ? nullptr : s->elements.at(i); }
+    const StructElement *getChild(int i) const { return isContent() ? nullptr : s->elements.at(i).get(); }
+    StructElement *getChild(int i) { return isContent() ? nullptr : s->elements.at(i).get(); }
 
-    void appendChild(StructElement *element)
+    void appendChild(std::unique_ptr<StructElement> element)
     {
         if (!isContent() && element && element->isOk()) {
-            s->elements.push_back(element);
+            s->elements.push_back(std::move(element));
         }
     }
 
     unsigned getNumAttributes() const { return isContent() ? 0 : s->attributes.size(); }
-    const Attribute *getAttribute(int i) const { return isContent() ? nullptr : s->attributes.at(i); }
-    Attribute *getAttribute(int i) { return isContent() ? nullptr : s->attributes.at(i); }
+    const Attribute *getAttribute(int i) const { return isContent() ? nullptr : s->attributes.at(i).get(); }
+    Attribute *getAttribute(int i) { return isContent() ? nullptr : s->attributes.at(i).get(); }
 
-    void appendAttribute(Attribute *attribute)
+    void appendAttribute(std::unique_ptr<Attribute> attribute)
     {
         if (!isContent() && attribute) {
-            s->attributes.push_back(attribute);
+            s->attributes.push_back(std::move(attribute));
         }
     }
 
@@ -342,13 +345,13 @@ public:
     }
 
     ~StructElement();
+    StructElement(Dict *elementDict, StructTreeRoot *treeRootA, StructElement *parentA, RefRecursionChecker &seen, PrivateTag = {});
+    StructElement(int mcid, StructTreeRoot *treeRootA, StructElement *parentA, PrivateTag = {});
+    StructElement(const Ref ref, StructTreeRoot *treeRootA, StructElement *parentA, PrivateTag = {});
 
 private:
     GooString *appendSubTreeText(GooString *string, bool recursive) const;
     const TextSpanArray &getTextSpansInternal(MarkedContentOutputDev &mcdev) const;
-
-    typedef std::vector<Attribute *> AttrPtrArray;
-    typedef std::vector<StructElement *> ElemPtrArray;
 
     struct StructData
     {
@@ -360,8 +363,8 @@ private:
         std::unique_ptr<GooString> expandedAbbr;
         std::unique_ptr<GooString> language;
         unsigned int revision;
-        ElemPtrArray elements;
-        AttrPtrArray attributes;
+        std::vector<std::unique_ptr<StructElement>> elements;
+        std::vector<std::unique_ptr<Attribute>> attributes;
 
         StructData();
         ~StructData();
@@ -394,12 +397,8 @@ private:
         ContentData *c;
     };
 
-    StructElement(Dict *elementDict, StructTreeRoot *treeRootA, StructElement *parentA, RefRecursionChecker &seen);
-    StructElement(int mcid, StructTreeRoot *treeRootA, StructElement *parentA);
-    StructElement(const Ref ref, StructTreeRoot *treeRootA, StructElement *parentA);
-
     void parse(Dict *elementDict);
-    StructElement *parseChild(const Object *ref, Object *childObj, RefRecursionChecker &seen);
+    void parseChild(const Object *ref, Object *childObj, RefRecursionChecker &seen);
     void parseChildren(Dict *element, RefRecursionChecker &seen);
     void parseAttributes(Dict *attributes, bool keepExisting = false);
 

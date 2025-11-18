@@ -18,6 +18,7 @@
 #include "StructElement.h"
 #include <map>
 #include <vector>
+#include <memory>
 
 class Dict;
 class PDFDoc;
@@ -35,30 +36,9 @@ public:
     Dict *getRoleMap() { return roleMap.isDict() ? roleMap.getDict() : nullptr; }
     Dict *getClassMap() { return classMap.isDict() ? classMap.getDict() : nullptr; }
     unsigned getNumChildren() const { return elements.size(); }
-    const StructElement *getChild(int i) const { return elements.at(i); }
-    StructElement *getChild(int i) { return elements.at(i); }
-
-    void appendChild(StructElement *element)
-    {
-        if (element && element->isOk()) {
-            elements.push_back(element);
-        }
-    }
-
-    const StructElement *findParentElement(int key, unsigned mcid = 0) const
-    {
-        auto it = parentTree.find(key);
-        if (it != parentTree.end()) {
-            if (mcid < it->second.size()) {
-                return it->second[mcid].element;
-            }
-        }
-        return nullptr;
-    }
+    const StructElement *getChild(int i) const { return elements.at(i).get(); }
 
 private:
-    typedef std::vector<StructElement *> ElemPtrArray;
-
     // Structure for items in /ParentTree, it keeps a mapping of
     // object references and pointers to StructElement objects.
     struct Parent
@@ -70,13 +50,20 @@ private:
     PDFDoc *doc;
     Object roleMap;
     Object classMap;
-    ElemPtrArray elements;
+    std::vector<std::unique_ptr<StructElement>> elements;
     std::map<int, std::vector<Parent>> parentTree;
     std::multimap<Ref, Parent *> refToParentMap;
 
     void parse(const Dict &rootDict);
     void parseNumberTreeNode(const Dict &node);
     void parentTreeAdd(const Ref objectRef, StructElement *element);
+
+    void appendChild(std::unique_ptr<StructElement> element)
+    {
+        if (element && element->isOk()) {
+            elements.push_back(std::move(element));
+        }
+    }
 
     friend class StructElement;
 };

@@ -18,7 +18,6 @@
 #include "StructElement.h"
 #include "StructTreeRoot.h"
 #include "GlobalParams.h"
-#include "UnicodeMap.h"
 #include "PDFDoc.h"
 #include "Dict.h"
 
@@ -637,7 +636,7 @@ Attribute::Type Attribute::getTypeForName(const char *name, StructElement *eleme
     return entry ? entry->type : Unknown;
 }
 
-Attribute *Attribute::parseUserProperty(Dict *property)
+std::unique_ptr<Attribute> Attribute::parseUserProperty(Dict *property)
 {
     Object obj, value;
     GooString name;
@@ -658,7 +657,7 @@ Attribute *Attribute::parseUserProperty(Dict *property)
         return nullptr;
     }
 
-    Attribute *attribute = new Attribute(std::move(name), &value);
+    auto attribute = std::make_unique<Attribute>(std::move(name), &value);
     obj = property->lookup("F");
     if (obj.isString()) {
         attribute->setFormattedValue(obj.getString());
@@ -682,17 +681,9 @@ Attribute *Attribute::parseUserProperty(Dict *property)
 
 StructElement::StructData::StructData() : altText(nullptr), actualText(nullptr), id(nullptr), title(nullptr), expandedAbbr(nullptr), language(nullptr), revision(0) { }
 
-StructElement::StructData::~StructData()
-{
-    for (StructElement *element : elements) {
-        delete element;
-    }
-    for (Attribute *attribute : attributes) {
-        delete attribute;
-    }
-}
+StructElement::StructData::~StructData() = default;
 
-StructElement::StructElement(Dict *element, StructTreeRoot *treeRootA, StructElement *parentA, RefRecursionChecker &seen) : type(Unknown), treeRoot(treeRootA), parent(parentA), s(new StructData())
+StructElement::StructElement(Dict *element, StructTreeRoot *treeRootA, StructElement *parentA, RefRecursionChecker &seen, PrivateTag) : type(Unknown), treeRoot(treeRootA), parent(parentA), s(new StructData())
 {
     assert(treeRoot);
     assert(element);
@@ -701,13 +692,13 @@ StructElement::StructElement(Dict *element, StructTreeRoot *treeRootA, StructEle
     parseChildren(element, seen);
 }
 
-StructElement::StructElement(int mcid, StructTreeRoot *treeRootA, StructElement *parentA) : type(MCID), treeRoot(treeRootA), parent(parentA), c(new ContentData(mcid))
+StructElement::StructElement(int mcid, StructTreeRoot *treeRootA, StructElement *parentA, PrivateTag) : type(MCID), treeRoot(treeRootA), parent(parentA), c(new ContentData(mcid))
 {
     assert(treeRoot);
     assert(parent);
 }
 
-StructElement::StructElement(const Ref ref, StructTreeRoot *treeRootA, StructElement *parentA) : type(OBJR), treeRoot(treeRootA), parent(parentA), c(new ContentData(ref))
+StructElement::StructElement(const Ref ref, StructTreeRoot *treeRootA, StructElement *parentA, PrivateTag) : type(OBJR), treeRoot(treeRootA), parent(parentA), c(new ContentData(ref))
 {
     assert(treeRoot);
     assert(parent);
@@ -1044,15 +1035,15 @@ void StructElement::parse(Dict *element)
     }
 }
 
-StructElement *StructElement::parseChild(const Object *ref, Object *childObj, RefRecursionChecker &seen)
+void StructElement::parseChild(const Object *ref, Object *childObj, RefRecursionChecker &seen)
 {
     assert(childObj);
     assert(ref);
 
-    StructElement *child = nullptr;
+    std::unique_ptr<StructElement> child;
 
     if (childObj->isInt()) {
-        child = new StructElement(childObj->getInt(), treeRoot, this);
+        child = std::make_unique<StructElement>(childObj->getInt(), treeRoot, this);
     } else if (childObj->isDict("MCR")) {
         /*
          * TODO: The optional StmOwn attribute is not handled.
@@ -1061,10 +1052,10 @@ StructElement *StructElement::parseChild(const Object *ref, Object *childObj, Re
         Object mcidObj = childObj->dictLookup("MCID");
         if (!mcidObj.isInt()) {
             error(errSyntaxError, -1, "MCID object is wrong type ({0:s})", mcidObj.getTypeName());
-            return nullptr;
+            return;
         }
 
-        child = new StructElement(mcidObj.getInt(), treeRoot, this);
+        child = std::make_unique<StructElement>(mcidObj.getInt(), treeRoot, this);
 
         Object pageRefObj = childObj->dictLookupNF("Pg").copy();
         if (pageRefObj.isRef()) {
@@ -1076,15 +1067,14 @@ StructElement *StructElement::parseChild(const Object *ref, Object *childObj, Re
             child->stmRef = stmObj.copy();
         } else if (!stmObj.isNull()) {
             error(errSyntaxError, -1, "Stm object is wrong type ({0:s})", stmObj.getTypeName());
-            delete child;
-            return nullptr;
+            return;
         }
 
     } else if (childObj->isDict("OBJR")) {
         const Object &refObj = childObj->dictLookupNF("Obj");
         if (refObj.isRef()) {
 
-            child = new StructElement(refObj.getRef(), treeRoot, this);
+            child = std::make_unique<StructElement>(refObj.getRef(), treeRoot, this);
 
             Object pageRefObj = childObj->dictLookupNF("Pg").copy();
             if (pageRefObj.isRef()) {
@@ -1097,7 +1087,7 @@ StructElement *StructElement::parseChild(const Object *ref, Object *childObj, Re
         if (!ref->isRef()) {
             error(errSyntaxError, -1, "Structure element dictionary is not an indirect reference ({0:s})", ref->getTypeName());
         } else if (seen.insert(ref->getRef())) {
-            child = new StructElement(childObj->getDict(), treeRoot, this, seen);
+            child = std::make_unique<StructElement>(childObj->getDict(), treeRoot, this, seen);
         } else {
             error(errSyntaxWarning, -1, "Loop detected in structure tree, skipping subtree at object {0:d}:{1:d}", ref->getRefNum(), ref->getRefGen());
         }
@@ -1107,17 +1097,12 @@ StructElement *StructElement::parseChild(const Object *ref, Object *childObj, Re
 
     if (child) {
         if (child->isOk()) {
-            appendChild(child);
             if (ref->isRef()) {
-                treeRoot->parentTreeAdd(ref->getRef(), child);
+                treeRoot->parentTreeAdd(ref->getRef(), child.get());
             }
-        } else {
-            delete child;
-            child = nullptr;
+            appendChild(std::move(child));
         }
     }
-
-    return child;
 }
 
 void StructElement::parseChildren(Dict *element, RefRecursionChecker &seen)
@@ -1145,12 +1130,11 @@ void StructElement::parseAttributes(Dict *attributes, bool keepExisting)
             for (int i = 0; i < userProperties.arrayGetLength(); i++) {
                 Object property = userProperties.arrayGet(i);
                 if (property.isDict()) {
-                    Attribute *attribute = Attribute::parseUserProperty(property.getDict());
+                    std::unique_ptr<Attribute> attribute = Attribute::parseUserProperty(property.getDict());
                     if (attribute && attribute->isOk()) {
-                        appendAttribute(attribute);
+                        appendAttribute(std::move(attribute));
                     } else {
                         error(errSyntaxWarning, -1, "Item in P is invalid");
-                        delete attribute;
                     }
                 } else {
                     error(errSyntaxWarning, -1, "Item in P is wrong type ({0:s})", property.getTypeName());
@@ -1186,17 +1170,16 @@ void StructElement::parseAttributes(Dict *attributes, bool keepExisting)
                     if (t != Attribute::Unknown) {
                         Object value = attributes->getVal(i);
                         bool typeCheckOk = true;
-                        Attribute *attribute = new Attribute(t, &value);
+                        auto attribute = std::make_unique<Attribute>(t, &value);
 
                         if (attribute->isOk() && (typeCheckOk = attribute->checkType(this))) {
-                            appendAttribute(attribute);
+                            appendAttribute(std::move(attribute));
                         } else {
                             // It is not needed to free "value", the Attribute instance
                             // owns the contents, so deleting "attribute" is enough.
                             if (!typeCheckOk) {
                                 error(errSyntaxWarning, -1, "Attribute {0:s} value is of wrong type ({1:s})", attribute->getTypeName(), attribute->getValue()->getTypeName());
                             }
-                            delete attribute;
                         }
                     } else {
                         error(errSyntaxWarning, -1, "Wrong Attribute '{0:s}' in element {1:s}", key, getTypeName());
