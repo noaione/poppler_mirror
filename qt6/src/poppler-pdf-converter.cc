@@ -50,6 +50,7 @@ public:
     ~PDFConverterPrivate() override;
 
     PDFConverter::PDFOptions opts;
+    PDFWriteMode writeMode;
 };
 
 PDFConverterPrivate::PDFConverterPrivate() = default;
@@ -60,6 +61,7 @@ PDFConverter::PDFConverter(DocumentData *document) : BaseConverter(*new PDFConve
 {
     Q_D(PDFConverter);
     d->document = document;
+    d->writeMode = writeStandard;
 }
 
 PDFConverter::~PDFConverter() = default;
@@ -74,6 +76,44 @@ PDFConverter::PDFOptions PDFConverter::pdfOptions() const
 {
     Q_D(const PDFConverter);
     return d->opts;
+}
+
+void PDFConverter::setPDFWriteMode(PDFConverter::PDFWriteMode mode)
+{
+    Q_D(PDFConverter);
+
+    switch (mode) {
+    case PDFConverter::PDFWriteMode::ForceRewrite:
+        d->writeMode = writeForceRewrite;
+        break;
+    case PDFConverter::PDFWriteMode::ForceIncremental:
+        d->writeMode = writeForceIncremental;
+        break;
+    case PDFConverter::PDFWriteMode::Standard:
+    default:
+        d->writeMode = writeStandard;
+        break;
+    }
+}
+
+PDFConverter::PDFWriteMode PDFConverter::pdfWriteMode() const
+{
+    Q_D(const PDFConverter);
+    PDFConverter::PDFWriteMode mode = Standard;
+
+    switch (d->writeMode) {
+    case writeForceRewrite:
+        mode = ForceRewrite;
+        break;
+    case writeForceIncremental:
+        mode = ForceIncremental;
+        break;
+    case writeStandard:
+    default:
+        break;
+    }
+
+    return mode;
 }
 
 bool PDFConverter::convert()
@@ -100,7 +140,7 @@ bool PDFConverter::convert()
     int errorCode = errNone;
     QIODeviceOutStream stream(dev);
     if (d->opts & WithChanges) {
-        errorCode = d->document->doc->saveAs(&stream);
+        errorCode = d->document->doc->saveAs(&stream, d->writeMode);
     } else {
         errorCode = d->document->doc->saveWithoutChangesAs(&stream);
     }

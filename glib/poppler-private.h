@@ -33,6 +33,8 @@ struct _PopplerDocument
     GList *layers;
     GList *layers_rbgroups;
     CairoOutputDev *output_dev;
+
+    PDFWriteMode write_mode;
 };
 
 struct _PopplerPSFile
