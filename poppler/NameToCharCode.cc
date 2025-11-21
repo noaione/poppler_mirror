@@ -26,12 +26,12 @@
 #include <cstring>
 #include "NameToCharCode.h"
 
-void NameToCharCode::add(const char *name, CharCode c)
+void NameToCharCode::add(std::string_view name, CharCode c)
 {
     tab.insert_or_assign(std::string { name }, c);
 }
 
-CharCode NameToCharCode::lookup(const char *name) const
+CharCode NameToCharCode::lookup(std::string_view name) const
 {
     auto it = tab.find(name);
     if (it != tab.end()) {

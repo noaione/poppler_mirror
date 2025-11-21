@@ -53,8 +53,8 @@
 #include <optional>
 #include <vector>
 #include <filesystem>
+#include "goo/string_view.h"
 
-class GooString;
 class NameToCharCode;
 class CharCodeToUnicode;
 class CharCodeToUnicodeCache;
@@ -87,7 +87,7 @@ struct FamilyStyleFontSearchResult
 {
     FamilyStyleFontSearchResult() = default;
 
-    FamilyStyleFontSearchResult(const std::string &filepathA, int faceIndexA, bool substitutedA) : filepath(filepathA), faceIndex(faceIndexA), substituted(substitutedA) { }
+    FamilyStyleFontSearchResult(std::string_view filepathA, int faceIndexA, bool substitutedA) : filepath(filepathA), faceIndex(faceIndexA), substituted(substitutedA) { }
 
     std::string filepath;
     int faceIndex = 0;
@@ -100,7 +100,7 @@ struct UCharFontSearchResult
 {
     UCharFontSearchResult() = default;
 
-    UCharFontSearchResult(const std::string &filepathA, int faceIndexA, const std::string &familyA, const std::string &styleA) : filepath(filepathA), faceIndex(faceIndexA), family(familyA), style(styleA) { }
+    UCharFontSearchResult(std::string_view filepathA, int faceIndexA, std::string_view familyA, std::string_view styleA) : filepath(filepathA), faceIndex(faceIndexA), family(familyA), style(styleA) { }
 
     const std::string filepath;
     const int faceIndex = 0;
@@ -114,44 +114,44 @@ class POPPLER_PRIVATE_EXPORT GlobalParams
 {
 public:
     // Initialize the global parameters
-    explicit GlobalParams(const std::string &customPopplerDataDir = {});
+    explicit GlobalParams(std::string_view customPopplerDataDir = {});
 
     ~GlobalParams();
 
     GlobalParams(const GlobalParams &) = delete;
     GlobalParams &operator=(const GlobalParams &) = delete;
 
-    void setupBaseFonts(const char *dir);
+    void setupBaseFonts(std::optional<std::string_view> dir);
 
     //----- accessors
 
-    CharCode getMacRomanCharCode(const char *charName);
+    CharCode getMacRomanCharCode(std::string_view charName);
 
     // Return Unicode values for character names.  Used for general text
     // extraction.
-    Unicode mapNameToUnicodeText(const char *charName);
+    Unicode mapNameToUnicodeText(std::string_view charName);
 
     // Return Unicode values for character names.  Used for glyph
     // lookups or text extraction with ZapfDingbats fonts.
-    Unicode mapNameToUnicodeAll(const char *charName);
-
-    UnicodeMap *getResidentUnicodeMap(const std::string &encodingName);
-    FILE *getUnicodeMapFile(const std::string &encodingName);
-    FILE *findCMapFile(const std::string &collection, const std::string &cMapName);
-    FILE *findToUnicodeFile(const std::string &name);
-    std::optional<std::string> findFontFile(const std::string &fontName);
-    std::optional<std::string> findBase14FontFile(const GooString *base14Name, const GfxFont &font, GooString *substituteFontName = nullptr);
-    std::optional<std::string> findSystemFontFile(const GfxFont &font, SysFontType *type, int *fontNum, GooString *substituteFontName = nullptr, const GooString *base14Name = nullptr);
     FamilyStyleFontSearchResult findSystemFontFileForFamilyAndStyle(const std::string &fontFamily, const std::string &fontStyle, const std::vector<std::string> &filesToIgnore = {});
+    Unicode mapNameToUnicodeAll(std::string_view charName);
+
+    UnicodeMap *getResidentUnicodeMap(std::string_view encodingName);
+    FILE *getUnicodeMapFile(std::string_view encodingName);
+    FILE *findCMapFile(std::string_view collection, std::string_view cMapName);
+    FILE *findToUnicodeFile(std::string_view name);
+    std::optional<std::string> findFontFile(std::string_view fontName);
+    std::optional<std::string> findBase14FontFile(std::string_view base14Name, const GfxFont &font, GooString *substituteFontName = nullptr);
+    std::optional<std::string> findSystemFontFile(const GfxFont &font, SysFontType *type, int *fontNum, GooString *substituteFontName = nullptr, std::optional<std::string_view> base14Name = {});
     UCharFontSearchResult findSystemFontFileForUChar(Unicode uChar, const GfxFont &fontToEmulate);
     std::string getTextEncodingName() const;
     bool getPrintCommands();
     bool getProfileCommands();
     bool getErrQuiet();
 
-    std::shared_ptr<CharCodeToUnicode> getCIDToUnicode(const std::string &collection);
-    const UnicodeMap *getUnicodeMap(const std::string &encodingName);
-    std::shared_ptr<CMap> getCMap(const std::string &collection, const std::string &cMapName);
+    std::shared_ptr<CharCodeToUnicode> getCIDToUnicode(std::string_view collection);
+    const UnicodeMap *getUnicodeMap(std::string_view encodingName);
+    std::shared_ptr<CMap> getCMap(std::string_view collection, std::string_view cMapName);
     const UnicodeMap *getTextEncoding();
 
     const UnicodeMap *getUtf8Map();
@@ -159,15 +159,15 @@ public:
     std::vector<std::string> getEncodingNames();
 
     //----- functions to set parameters
-    void addFontFile(const std::string &fontName, const std::string &path);
-    void setTextEncoding(const std::string &encodingName);
+    void addFontFile(std::string_view fontName, std::string_view path);
+    void setTextEncoding(std::string_view encodingName);
     void setPrintCommands(bool printCommandsA);
     void setProfileCommands(bool profileCommandsA);
     void setErrQuiet(bool errQuietA);
 #ifdef ANDROID
-    static void setFontDir(const std::string &fontDir);
+    static void setFontDir(std::string_view fontDir);
 #endif
-    static bool parseYesNo2(const char *token, bool *flag);
+    static bool parseYesNo2(std::string_view token, bool *flag);
 
 private:
     void parseNameToUnicode(const std::filesystem::path &name);
@@ -190,23 +190,23 @@ private:
             nameToUnicodeText; // extraction
     // files for mappings from char collections
     // to Unicode, indexed by collection name
-    std::unordered_map<std::string, std::string> cidToUnicodes;
+    std::unordered_map<std::string, std::string, string_hash, std::equal_to<>> cidToUnicodes;
     // mappings from Unicode to char codes,
     // indexed by encoding name
-    std::unordered_map<std::string, UnicodeMap> residentUnicodeMaps;
+    std::unordered_map<std::string, UnicodeMap, string_hash, std::equal_to<>> residentUnicodeMaps;
     // files for mappings from Unicode to char
     // codes, indexed by encoding name
-    std::unordered_map<std::string, std::string> unicodeMaps;
+    std::unordered_map<std::string, std::string, string_hash, std::equal_to<>> unicodeMaps;
     // list of CMap dirs, indexed by collection
-    std::unordered_multimap<std::string, std::string> cMapDirs;
+    std::unordered_multimap<std::string, std::string, string_hash, std::equal_to<>> cMapDirs;
     std::vector<std::string> toUnicodeDirs; // list of ToUnicode CMap dirs
     bool baseFontsInitialized;
 #ifdef _WIN32
     // windows font substitutes (for CID fonts)
-    std::unordered_map<std::string, std::string> substFiles;
+    std::unordered_map<std::string, std::string, string_hash, std::equal_to<>> substFiles;
 #endif
     // font files: font name mapped to path
-    std::unordered_map<std::string, std::string> fontFiles;
+    std::unordered_map<std::string, std::string, string_hash, std::equal_to<>> fontFiles;
     SysFontList *sysFonts; // system fonts
     std::string textEncoding; // encoding (unicodeMap) to use for text
                               //   output
@@ -237,7 +237,7 @@ public:
     GlobalParamsIniter(const GlobalParamsIniter &) = delete;
     GlobalParamsIniter &operator=(const GlobalParamsIniter &) = delete;
 
-    static bool setCustomDataDir(const std::string &dir);
+    static bool setCustomDataDir(std::string_view dir);
 
 private:
     static std::mutex mutex;

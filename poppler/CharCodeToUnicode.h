@@ -64,7 +64,7 @@ public:
     // Read the CID-to-Unicode mapping for <collection> from the file
     // specified by <fileName>.  Sets the initial reference count to 1.
     // Returns NULL on failure.
-    static std::unique_ptr<CharCodeToUnicode> parseCIDToUnicode(const char *fileName, const std::string &collection);
+    static std::unique_ptr<CharCodeToUnicode> parseCIDToUnicode(const char *fileName, std::string_view collection);
 
     // Create the CharCode-to-Unicode mapping for an 8-bit font.
     // <toUnicode> is an array of 256 Unicode indexes.  Sets the initial
@@ -73,7 +73,7 @@ public:
 
     // Parse a ToUnicode CMap for an 8- or 16-bit font.
     static std::unique_ptr<CharCodeToUnicode> parseCMap(const std::string &buf, int nBits);
-    static std::unique_ptr<CharCodeToUnicode> parseCMapFromFile(const std::string &fileName, int nBits);
+    static std::unique_ptr<CharCodeToUnicode> parseCMapFromFile(std::string_view fileName, int nBits);
 
     // Parse a ToUnicode CMap for an 8- or 16-bit font, merging it into
     // <this>.
@@ -85,7 +85,7 @@ public:
     CharCodeToUnicode &operator=(const CharCodeToUnicode &) = delete;
 
     // Return true if this mapping matches the specified <tagA>.
-    bool match(const std::string &tagA);
+    bool match(std::string_view tagA);
 
     // Set the mapping for <c>.
     void setMapping(CharCode c, Unicode *u, int len);
@@ -99,8 +99,8 @@ public:
     int mapToCharCode(const Unicode *u, CharCode *c, int usize) const;
 
     explicit CharCodeToUnicode(PrivateTag t = {});
-    explicit CharCodeToUnicode(const std::optional<std::string> &tagA, PrivateTag t = {});
-    CharCodeToUnicode(const std::optional<std::string> &tagA, std::vector<Unicode> &&mapA, std::vector<CharCodeToUnicodeString> &&sMapA, PrivateTag t = {});
+    explicit CharCodeToUnicode(const std::optional<std::string_view> &tagA, PrivateTag t = {});
+    CharCodeToUnicode(const std::optional<std::string_view> &tagA, std::vector<Unicode> &&mapA, std::vector<CharCodeToUnicodeString> &&sMapA, PrivateTag t = {});
 
 private:
     bool parseCMap1(int (*getCharFunc)(void *), void *data, int nBits);
@@ -126,7 +126,7 @@ public:
 
     // Get the CharCodeToUnicode object for <tag>.
     // Returns NULL on failure.
-    std::shared_ptr<CharCodeToUnicode> getCharCodeToUnicode(const std::string &tag);
+    std::shared_ptr<CharCodeToUnicode> getCharCodeToUnicode(std::string_view tag);
 
     // Insert <ctu> into the cache, in the most-recently-used position.
     void add(std::shared_ptr<CharCodeToUnicode> ctu);

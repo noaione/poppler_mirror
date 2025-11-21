@@ -63,14 +63,14 @@ class POPPLER_PRIVATE_EXPORT UnicodeMap
 public:
     // Create the UnicodeMap specified by <encodingName>.  Sets the
     // initial reference count to 1.  Returns NULL on failure.
-    static std::unique_ptr<UnicodeMap> parse(const std::string &encodingNameA);
+    static std::unique_ptr<UnicodeMap> parse(std::string_view encodingNameA);
 
     // Create a resident UnicodeMap.
-    UnicodeMap(const char *encodingNameA, bool unicodeOutA, std::span<const UnicodeMapRange> rangesA);
+    UnicodeMap(std::string_view encodingNameA, bool unicodeOutA, std::span<const UnicodeMapRange> rangesA);
 
     // Create a resident UnicodeMap that uses a function instead of a
     // list of ranges.
-    UnicodeMap(const char *encodingNameA, bool unicodeOutA, UnicodeMapFunc funcA);
+    UnicodeMap(std::string_view encodingNameA, bool unicodeOutA, UnicodeMapFunc funcA);
 
     UnicodeMap(UnicodeMap &&other) noexcept;
     UnicodeMap &operator=(UnicodeMap &&other) noexcept;
@@ -88,7 +88,7 @@ public:
 
     // Return true if this UnicodeMap matches the specified
     // <encodingNameA>.
-    bool match(const std::string &encodingNameA) const;
+    bool match(std::string_view encodingNameA) const;
 
     // Map Unicode to the target encoding.  Fills in <buf> with the
     // output and returns the number of bytes used.  Output will be
@@ -97,7 +97,7 @@ public:
     int mapUnicode(Unicode u, char *buf, int bufSize) const;
 
 private:
-    explicit UnicodeMap(const std::string &encodingNameA);
+    explicit UnicodeMap(std::string_view encodingNameA);
 
     std::string encodingName;
     bool unicodeOut;
@@ -113,7 +113,7 @@ public:
     UnicodeMapCache();
 
     // Get the UnicodeMap for <encodingName>.  Returns NULL on failure.
-    const UnicodeMap *getUnicodeMap(const std::string &encodingName);
+    const UnicodeMap *getUnicodeMap(std::string_view encodingName);
 
 private:
     std::vector<std::unique_ptr<UnicodeMap>> cache;

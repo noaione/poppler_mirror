@@ -183,16 +183,22 @@ static bool FileExists(const char *path)
     return false;
 }
 
-void SysFontList::scanWindowsFonts(const std::string &winFontDir)
+static bool caseInsensitiveEndsWith(std::string_view a, std::string_view suff)
+{
+    if (a.size() < suff.size())
+        return false;
+    return strncasecmp(a.data() + a.size() - suff.size(), suff.data(), suff.size());
+}
+
+void SysFontList::scanWindowsFonts(std::string_view winFontDir)
 {
     OSVERSIONINFO version;
     const char *path;
     DWORD idx, valNameLen, dataLen, type;
     HKEY regKey;
     char valName[1024], data[1024];
-    int n, fontNum;
+    int fontNum;
     char *p0, *p1;
-    GooString *fontPath;
 
     version.dwOSVersionInfoSize = sizeof(version);
     GetVersionEx(&version);
@@ -212,13 +218,13 @@ void SysFontList::scanWindowsFonts(const std::string &winFontDir)
             if (type == REG_SZ && valNameLen > 0 && valNameLen < sizeof(valName) && dataLen > 0 && dataLen < sizeof(data)) {
                 valName[valNameLen] = '\0';
                 data[dataLen] = '\0';
-                n = strlen(data);
-                if (!strcasecmp(data + n - 4, ".ttf") || !strcasecmp(data + n - 4, ".ttc") || !strcasecmp(data + n - 4, ".otf")) {
-                    fontPath = new GooString(data);
+                std::string_view s(data, dataLen);
+                if (caseInsensitiveEndsWith(s, ".ttf") || caseInsensitiveEndsWith(s, ".ttc") || caseInsensitiveEndsWith(s, ".otf")) {
+                    GooString fontPath(s);
                     if (!(dataLen >= 3 && data[1] == ':' && data[2] == '\\')) {
-                        fontPath->insert(0, 1, '\\');
-                        fontPath->insert(0, winFontDir);
-                        fontPath->append('\0');
+                        fontPath.insert(0, 1, '\\');
+                        fontPath.insert(0, winFontDir);
+                        fontPath.append('\0');
                     }
                     p0 = valName;
                     fontNum = 0;
@@ -230,11 +236,10 @@ void SysFontList::scanWindowsFonts(const std::string &winFontDir)
                         } else {
                             p1 = p0 + strlen(p0);
                         }
-                        fonts.push_back(makeWindowsFont(p0, fontNum, fontPath->c_str()));
+                        fonts.push_back(makeWindowsFont(p0, fontNum, fontPath));
                         p0 = p1;
                         ++fontNum;
                     }
-                    delete fontPath;
                 }
             }
             ++idx;
@@ -243,59 +248,57 @@ void SysFontList::scanWindowsFonts(const std::string &winFontDir)
     }
 }
 
-SysFontInfo *SysFontList::makeWindowsFont(const char *name, int fontNum, const char *path)
+SysFontInfo *SysFontList::makeWindowsFont(std::string_view name, int fontNum, std::string_view path)
 {
-    int n;
     bool bold, italic, oblique, fixedWidth;
     char c;
     SysFontType type;
     GooString substituteName;
 
-    n = strlen(name);
     bold = italic = oblique = fixedWidth = false;
 
     // remove trailing ' (TrueType)'
-    if (n > 11 && !strncmp(name + n - 11, " (TrueType)", 11)) {
-        n -= 11;
+    if (name.ends_with(" (TrueType)")) {
+        name.remove_suffix(11);
     }
 
     // remove trailing ' (OpenType)'
-    if (n > 11 && !strncmp(name + n - 11, " (OpenType)", 11)) {
-        n -= 11;
+    if (name.ends_with(" (OpenType)")) {
+        name.remove_suffix(11);
     }
 
     // remove trailing ' Italic'
-    if (n > 7 && !strncmp(name + n - 7, " Italic", 7)) {
-        n -= 7;
+    if (name.ends_with(" Italic")) {
+        name.remove_suffix(7);
         italic = true;
     }
 
     // remove trailing ' Oblique'
-    if (n > 8 && !strncmp(name + n - 8, " Oblique", 8)) {
-        n -= 8;
+    if (name.ends_with(" Oblique")) {
+        name.remove_suffix(8);
         oblique = true;
     }
 
     // remove trailing ' Bold'
-    if (n > 5 && !strncmp(name + n - 5, " Bold", 5)) {
-        n -= 5;
+    if (name.ends_with(" Bold")) {
+        name.remove_suffix(5);
         bold = true;
     }
 
     // remove trailing ' Regular'
-    if (n > 8 && !strncmp(name + n - 8, " Regular", 8)) {
-        n -= 8;
+    if (name.ends_with(" Regular")) {
+        name.remove_suffix(8);
     }
 
     // the familyname cannot indicate whether a font is fixedWidth or not.
     // some well-known fixedWidth typeface family names or keyword are checked.
-    if (strstr(name, "Courier") || strstr(name, "Fixed") || (strstr(name, "Mono") && !strstr(name, "Monotype")) || strstr(name, "Typewriter"))
+    if (name.contains("Courier") || name.contains("Fixed") || (name.contains("Mono") && !name.contains("Monotype")) || name.contains("Typewriter"))
         fixedWidth = true;
     else
         fixedWidth = false;
 
     //----- normalize the font name
-    std::unique_ptr<GooString> s = std::make_unique<GooString>(name, n);
+    std::unique_ptr<GooString> s = std::make_unique<GooString>(name);
     size_t i = 0;
     while (i < s->size()) {
         c = s->getChar(i);
@@ -306,34 +309,29 @@ SysFontInfo *SysFontList::makeWindowsFont(const char *name, int fontNum, const c
         }
     }
 
-    if (!strcasecmp(path + strlen(path) - 4, ".ttc")) {
+    if (caseInsensitiveEndsWith(path, ".ttc")) {
         type = sysFontTTC;
     } else {
         type = sysFontTTF;
     }
 
-    return new SysFontInfo(std::move(s), bold, italic, oblique, fixedWidth, std::make_unique<GooString>(path), type, fontNum, substituteName.copy());
+    return new SysFontInfo(std::move(s), bold, italic, oblique, fixedWidth, path, type, fontNum, substituteName.copy());
 }
 
-static GooString *replaceSuffix(GooString *path, const char *suffixA, const char *suffixB)
+static GooString *swapSuffix(GooString *path, std::string_view suffixA, std::string_view suffixB)
 {
-    int suffLenA = strlen(suffixA);
-    int suffLenB = strlen(suffixB);
-    int baseLenA = path->size() - suffLenA;
-    int baseLenB = path->size() - suffLenB;
-
-    if (!strcasecmp(path->c_str() + baseLenA, suffixA)) {
-        path->erase(baseLenA, suffLenA);
+    if (caseInsensitiveEndsWith(*path, suffixA)) {
+        path->erase(path->size() - suffixA.size(), suffixA.size());
         path->append(suffixB);
-    } else if (!strcasecmp(path->c_str() + baseLenB, suffixB)) {
-        path->erase(baseLenB, suffLenB);
+    } else if (caseInsensitiveEndsWith(*path, suffixB)) {
+        path->erase(path->size() - suffixB.size(), suffixB.size());
         path->append(suffixA);
     }
 
     return path;
 }
 
-void GlobalParams::setupBaseFonts(const char *dir)
+void GlobalParams::setupBaseFonts(std::optional<std::string_view> dir)
 {
     if (baseFontsInitialized)
         return;
@@ -343,7 +341,7 @@ void GlobalParams::setupBaseFonts(const char *dir)
 
     std::vector<std::string> fontDirs;
     if (dir) {
-        fontDirs.emplace_back(dir);
+        fontDirs.emplace_back(*dir);
     }
     if (!winFontDir.empty()) {
         fontDirs.emplace_back(winFontDir);
@@ -356,11 +354,12 @@ void GlobalParams::setupBaseFonts(const char *dir)
         const GooString fontName = GooString(displayFontTab[i].name);
 
         bool fontFound = false;
-        for (const std::string &fontDir : fontDirs) {
+        for (const auto &fontDir : fontDirs) {
             for (const std::string &fileName : displayFontTab[i].fileNames) {
-                const std::unique_ptr<GooString> fontPath(appendToPath(new GooString(fontDir), fileName.c_str()));
-                if (FileExists(fontPath->c_str()) || FileExists(replaceSuffix(fontPath.get(), ".pfb", ".pfa")->c_str()) || FileExists(replaceSuffix(fontPath.get(), ".ttc", ".ttf")->c_str())) {
-                    addFontFile(fontName.toStr(), fontPath->toStr());
+                GooString fontPath(fontDir);
+                appendToPath(&fontPath, fileName);
+                if (FileExists(fontPath.c_str()) || FileExists(swapSuffix(&fontPath, ".pfb", ".pfa")->c_str()) || FileExists(swapSuffix(&fontPath, ".ttc", ".ttf")->c_str())) {
+                    addFontFile(fontName.toStr(), fontPath.toStr());
                     fontFound = true;
                     break;
                 }
@@ -386,11 +385,10 @@ void GlobalParams::setupBaseFonts(const char *dir)
     const std::unique_ptr<GooFile> file = GooFile::open(fileName);
 
     if (file) {
-        Parser *parser;
-        parser = new Parser(nullptr, std::make_unique<FileStream>(file.get(), 0, false, file->size(), Object::null()), true);
-        Object obj1 = parser->getObj();
+        Parser parser(nullptr, std::make_unique<FileStream>(file.get(), 0, false, file->size(), Object::null()), true);
+        Object obj1 = parser.getObj();
         while (!obj1.isEOF()) {
-            Object obj2 = parser->getObj();
+            Object obj2 = parser.getObj();
             if (obj1.isName()) {
                 // Substitutions
                 if (obj2.isDict()) {
@@ -402,41 +400,32 @@ void GlobalParams::setupBaseFonts(const char *dir)
                     substFiles.emplace(obj1.getName(), obj2.getName());
                 }
             }
-            obj1 = parser->getObj();
+            obj1 = parser.getObj();
             // skip trailing ';'
             while (obj1.isCmd(";")) {
-                obj1 = parser->getObj();
+                obj1 = parser.getObj();
             }
         }
-        delete parser;
     }
 }
 
-static const char *findSubstituteName(const GfxFont *font, const std::unordered_map<std::string, std::string> &fontFiles, const std::unordered_map<std::string, std::string> &substFiles, const char *origName)
+static std::string_view findSubstituteName(const GfxFont *font, const std::unordered_map<std::string, std::string> &fontFiles, const std::unordered_map<std::string, std::string> &substFiles, std::string_view origName)
 {
-    assert(origName);
-    if (!origName)
-        return nullptr;
-    GooString *name2 = new GooString(origName);
-    int n = strlen(origName);
+    std::string name2(origName);
     // remove trailing "-Identity-H"
-    if (n > 11 && !strcmp(name2->c_str() + n - 11, "-Identity-H")) {
-        name2->erase(n - 11, 11);
-        n -= 11;
+    if (name2.ends_with("-Identity-H")) {
+        name2.erase(name2.size() - 11, 11);
     }
     // remove trailing "-Identity-V"
-    if (n > 11 && !strcmp(name2->c_str() + n - 11, "-Identity-V")) {
-        name2->erase(n - 11, 11);
-        n -= 11;
+    if (name2.ends_with("-Identity-H")) {
+        name2.erase(name2.size() - 11, 11);
     }
-    const auto substFile = substFiles.find(name2->c_str());
+    const auto substFile = substFiles.find(name2);
     if (substFile != substFiles.end()) {
-        delete name2;
-        return substFile->second.c_str();
+        return substFile->second;
     }
 
     /* TODO: try to at least guess bold/italic/bolditalic from the name */
-    delete name2;
     if (font->isCIDFont()) {
         const GooString *collection = ((GfxCIDFont *)font)->getCollection();
 
@@ -462,7 +451,7 @@ static const char *findSubstituteName(const GfxFont *font, const std::unordered_
 }
 
 /* Windows implementation of external font matching code */
-std::optional<std::string> GlobalParams::findSystemFontFile(const GfxFont &font, SysFontType *type, int *fontNum, GooString *substituteFontName, const GooString *base14Name)
+std::optional<std::string> GlobalParams::findSystemFontFile(const GfxFont &font, SysFontType *type, int *fontNum, GooString *substituteFontName, std::optional<std::string_view> base14Name)
 {
     const SysFontInfo *fi;
     std::string path;
@@ -483,9 +472,9 @@ std::optional<std::string> GlobalParams::findSystemFontFile(const GfxFont &font,
         if (substituteFontName)
             substituteFontName->Set(fi->substituteName->c_str());
     } else {
-        GooString *substFontName = new GooString(findSubstituteName(&font, fontFiles, substFiles, fontName->c_str()));
-        error(errSyntaxError, -1, "Couldn't find a font for '{0:s}', subst is '{1:t}'", fontName->c_str(), substFontName);
-        const auto fontFile = fontFiles.find(substFontName->toStr());
+        GooString substFontName(findSubstituteName(&font, fontFiles, substFiles, fontName));
+        error(errSyntaxError, -1, "Couldn't find a font for '{0:s}', subst is '{1:t}'", fontName->c_str(), &substFontName);
+        const auto fontFile = fontFiles.find(substFontName.toStr());
         if (fontFile != fontFiles.end()) {
             path = fontFile->second;
             if (substituteFontName)

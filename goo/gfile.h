@@ -86,7 +86,7 @@ typedef long long Goffset;
 
 // Append a file name to a path string.  <path> may be an empty
 // string, denoting the current directory).  Returns <path>.
-extern GooString POPPLER_PRIVATE_EXPORT *appendToPath(GooString *path, const char *fileName);
+extern GooString POPPLER_PRIVATE_EXPORT *appendToPath(GooString *path, std::string_view fileName);
 
 #ifndef _WIN32
 // Open a file descriptor

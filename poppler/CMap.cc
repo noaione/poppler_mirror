@@ -66,20 +66,22 @@ static int getCharFromStream(void *data)
 
 //------------------------------------------------------------------------
 
-std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectionA, Object *obj)
+std::shared_ptr<CMap> CMap::parse(CMapCache *cache, std::string_view collectionA, Object *obj)
 {
     RefRecursionChecker recursion;
     return parse(cache, collectionA, obj, recursion);
 }
 
-std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectionA, Object *obj, RefRecursionChecker &recursion)
+std::shared_ptr<CMap> CMap::parse(CMapCache *cache, std::string_view collectionA, Object *obj, RefRecursionChecker &recursion)
 {
     std::shared_ptr<CMap> cMap;
 
     if (obj->isName()) {
-        const GooString cMapNameA(obj->getNameString());
-        if (!(cMap = globalParams->getCMap(collectionA, cMapNameA.toStr()))) {
-            error(errSyntaxError, -1, "Unknown CMap '{0:t}' for character collection '{1:s}'", &cMapNameA, collectionA.c_str());
+        std::string_view cMapNameA(obj->getName());
+        if (!(cMap = globalParams->getCMap(collectionA, cMapNameA))) {
+            GooString errCollection(collectionA);
+            GooString errMapName(cMapNameA);
+            error(errSyntaxError, -1, "Unknown CMap '{0:t}' for character collection '{1:t}'", &errMapName, &errCollection);
         }
     } else if (obj->isStream()) {
         if (!(cMap = CMap::parse(nullptr, collectionA, obj->getStream(), recursion))) {
@@ -92,7 +94,7 @@ std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectio
     return cMap;
 }
 
-std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectionA, const std::string &cMapNameA)
+std::shared_ptr<CMap> CMap::parse(CMapCache *cache, std::string_view collectionA, std::string_view cMapNameA)
 {
     FILE *f;
 
@@ -106,7 +108,9 @@ std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectio
             return std::shared_ptr<CMap>(new CMap(std::make_unique<GooString>(collectionA), std::make_unique<GooString>(cMapNameA), 1));
         }
 
-        error(errSyntaxError, -1, "Couldn't find '{0:s}' CMap file for '{1:s}' collection", cMapNameA.c_str(), collectionA.c_str());
+        GooString errMapName(cMapNameA), errCollection(collectionA);
+
+        error(errSyntaxError, -1, "Couldn't find '{0:t}' CMap file for '{1:t}' collection", &errMapName, &errCollection);
         return {};
     }
 
@@ -118,7 +122,7 @@ std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectio
     return cMap;
 }
 
-std::shared_ptr<CMap> CMap::parse(CMapCache *cache, const std::string &collectionA, Stream *str, RefRecursionChecker &recursion)
+std::shared_ptr<CMap> CMap::parse(CMapCache *cache, std::string_view collectionA, Stream *str, RefRecursionChecker &recursion)
 {
     auto cMap = std::shared_ptr<CMap>(new CMap(std::make_unique<GooString>(collectionA), nullptr));
     Ref ref;
@@ -334,9 +338,9 @@ void CMap::freeCMapVector(CMapVectorEntry *vec)
     gfree(vec);
 }
 
-bool CMap::match(const std::string &collectionA, const std::string &cMapNameA)
+bool CMap::match(std::string_view collectionA, std::string_view cMapNameA)
 {
-    return !collection->cmp(collectionA) && !cMapName->cmp(cMapNameA);
+    return *collection == collectionA && *cMapName == cMapNameA;
 }
 
 CID CMap::getCID(const char *s, int len, CharCode *c, int *nUsed)
@@ -409,7 +413,7 @@ void CMap::setReverseMap(unsigned int *rmap, unsigned int rmapSize, unsigned int
 
 CMapCache::CMapCache() = default;
 
-std::shared_ptr<CMap> CMapCache::getCMap(const std::string &collection, const std::string &cMapName)
+std::shared_ptr<CMap> CMapCache::getCMap(std::string_view collection, std::string_view cMapName)
 {
     int i, j;
 
