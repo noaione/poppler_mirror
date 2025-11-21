@@ -64,17 +64,16 @@ public:
     ~DCTStream() override;
     StreamKind getKind() const override { return strDCT; }
     [[nodiscard]] bool reset() override;
-    int getChar() override;
-    int lookChar() override;
+
     std::optional<std::string> getPSFilter(int psLevel, const char *indent) override;
     bool isBinary(bool last = true) const override;
+
+    int getSomeChars(int nChars, unsigned char *buffer) override;
 
 private:
     void init();
 
-    bool hasGetChars() override { return true; }
     bool readLine();
-    int getChars(int nChars, unsigned char *buffer) override;
 
     int colorXform;
     JSAMPLE *current;

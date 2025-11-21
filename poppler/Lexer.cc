@@ -71,93 +71,51 @@ static const long long LongLongSafeLimit = (LLONG_MAX - 9) / 10;
 
 Lexer::Lexer(XRef *xrefA, std::unique_ptr<Stream> &&str)
 {
-    lookCharLastValueCached = LOOK_VALUE_NOT_CACHED;
     xref = xrefA;
+    nextStreamIdx = 1;
 
-    curStr = Object(std::move(str));
-    streams = new Array(xref);
-    streams->add(curStr.copy());
-    strPtr = 0;
-    freeArray = true;
-    (void)curStr.streamReset();
+    streams.emplace_back(std::move(str));
+
+    curStr = streams[0].getStream();
+    (void)curStr->reset();
 }
 
 Lexer::Lexer(XRef *xrefA, Object *obj)
 {
-    lookCharLastValueCached = LOOK_VALUE_NOT_CACHED;
     xref = xrefA;
+    nextStreamIdx = 1;
 
     if (obj->isStream()) {
-        streams = new Array(xref);
-        freeArray = true;
-        streams->add(obj->copy());
+        streams.emplace_back(obj->copy());
     } else {
-        streams = obj->getArray();
-        freeArray = false;
-    }
-    strPtr = 0;
-    if (streams->getLength() > 0) {
-        curStr = streams->get(strPtr);
-        if (curStr.isStream()) {
-            (void)curStr.streamReset();
+        auto arr = obj->getArray();
+        for (int i = 0; i < arr->getLength(); i++) {
+            auto elem = arr->get(i);
+            if (elem.isStream()) {
+                streams.emplace_back(std::move(elem));
+            }
+        }
+
+        if (streams.empty()) {
+            streams.emplace_back(std::make_unique<MemStream>(nullptr, 0, 0, Object()));
         }
     }
+
+    curStr = streams[0].getStream();
+    (void)curStr->reset();
 }
 
 Lexer::~Lexer()
 {
-    if (curStr.isStream()) {
-        curStr.streamClose();
-    }
-    if (freeArray) {
-        delete streams;
-    }
+    curStr->close();
 }
 
-int Lexer::getChar(bool comesFromLook)
+void Lexer::nextStream()
 {
-    int c;
-
-    if (LOOK_VALUE_NOT_CACHED != lookCharLastValueCached) {
-        c = lookCharLastValueCached;
-        lookCharLastValueCached = LOOK_VALUE_NOT_CACHED;
-        return c;
-    }
-
-    c = EOF;
-    while (curStr.isStream() && (c = curStr.streamGetChar()) == EOF) {
-        if (comesFromLook == true) {
-            return EOF;
-        } else {
-            curStr.streamClose();
-            curStr = Object();
-            ++strPtr;
-            if (strPtr < streams->getLength()) {
-                curStr = streams->get(strPtr);
-                if (curStr.isStream()) {
-                    if (!curStr.streamReset()) {
-                        return EOF;
-                    }
-                }
-            }
-        }
-    }
-    return c;
-}
-
-int Lexer::lookChar()
-{
-
-    if (LOOK_VALUE_NOT_CACHED != lookCharLastValueCached) {
-        return lookCharLastValueCached;
-    }
-    lookCharLastValueCached = getChar(true);
-    if (lookCharLastValueCached == EOF) {
-        lookCharLastValueCached = LOOK_VALUE_NOT_CACHED;
-        return EOF;
-    } else {
-        return lookCharLastValueCached;
-    }
+    curStr->close();
+    curStr = streams[nextStreamIdx].getStream();
+    nextStreamIdx++;
+    (void)curStr->reset();
 }
 
 Object Lexer::getObj(int objNum)

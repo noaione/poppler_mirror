@@ -62,6 +62,7 @@ bool FlateEncoder::reset()
     int zlib_status;
 
     bool innerReset = str->reset();
+    purgeBuffer();
 
     outBufPtr = outBufEnd = outBuf;
     inBufEof = outBufEof = false;

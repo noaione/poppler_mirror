@@ -986,13 +986,15 @@ public:
     ~DeviceNRecoder() override;
     StreamKind getKind() const override { return strWeird; }
     bool reset() override;
-    int getChar() override { return (bufIdx >= bufSize && !fillBuf()) ? EOF : buf[bufIdx++]; }
-    int lookChar() override { return (bufIdx >= bufSize && !fillBuf()) ? EOF : buf[bufIdx]; }
     std::optional<std::string> getPSFilter(int psLevel, const char *indent) override { return {}; }
     bool isBinary(bool last = true) const override { return true; }
     bool isEncoder() const override { return true; }
 
+    polyfillGetSomeChars(getRawChar);
+
 private:
+    int getRawChar() { return (bufIdx >= bufSize && !fillBuf()) ? EOF : buf[bufIdx++]; }
+
     bool fillBuf();
 
     int width, height;
@@ -3467,10 +3469,7 @@ bool PSOutputDev::checkPageSlice(Page *page, double /*hDPI*/, double /*vDPI*/, i
             (void)str->reset();
             if (useBinary) {
                 // Count the bytes to write a document comment
-                int len = 0;
-                while (str->getChar() != EOF) {
-                    len++;
-                }
+                int len = str->discardChars(INT_MAX);
                 (void)str->reset();
                 writePSFmt("%%BeginData: {0:d} Binary Bytes\n", len + 6 + 1);
             }
@@ -5955,9 +5954,7 @@ void PSOutputDev::doImageL2(GfxState *state, Object *ref, GfxImageColorMap *colo
                 // is data-dependent (because of ASCII and LZW/RLE filters)
                 n = 0;
                 if (str->reset()) {
-                    while ((c = str->getChar()) != EOF) {
-                        ++n;
-                    }
+                    n = str->discardChars(INT_MAX);
                     str->close();
                 }
             }

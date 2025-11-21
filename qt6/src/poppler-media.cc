@@ -26,8 +26,6 @@
 
 #include <QtCore/QBuffer>
 
-#define BUFFER_MAX 4096
-
 namespace Poppler {
 
 class MediaRenditionPrivate
@@ -94,12 +92,14 @@ QByteArray MediaRendition::data() const
     }
 
     QBuffer buffer;
-    unsigned char data[BUFFER_MAX];
-    int bread;
 
     buffer.open(QIODevice::WriteOnly);
-    while ((bread = s->doGetChars(BUFFER_MAX, data)) != 0) {
-        buffer.write(reinterpret_cast<const char *>(data), bread);
+    while (true) {
+        auto data = s->getSomeBufferedChars();
+        if (data.empty()) {
+            break;
+        }
+        buffer.write(reinterpret_cast<const char *>(data.data()), data.size());
     }
     buffer.close();
 

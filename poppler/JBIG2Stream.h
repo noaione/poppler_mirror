@@ -52,18 +52,16 @@ public:
     StreamKind getKind() const override { return strJBIG2; }
     [[nodiscard]] bool reset() override;
     void close() override;
-    Goffset getPos() override;
-    int getChar() override;
-    int lookChar() override;
+
     std::optional<std::string> getPSFilter(int psLevel, const char *indent) override;
     bool isBinary(bool last = true) const override;
     virtual Object *getGlobalsStream() { return &globalsStream; }
     virtual Ref getGlobalsStreamRef() { return globalsStreamRef; }
 
-private:
-    bool hasGetChars() override { return true; }
-    int getChars(int nChars, unsigned char *buffer) override;
+    int getSomeChars(int nChars, unsigned char *buffer) override;
+    Goffset getRawPos() override;
 
+private:
     void readSegments();
     bool readSymbolDictSeg(unsigned int segNum, unsigned int length, unsigned int *refSegs, unsigned int nRefSegs);
     void readTextRegionSeg(unsigned int segNum, bool imm, bool lossless, unsigned int length, unsigned int *refSegs, unsigned int nRefSegs);

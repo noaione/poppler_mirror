@@ -338,7 +338,6 @@ BaseCryptStream::BaseCryptStream(Stream *strA, const unsigned char *fileKey, Cry
     }
 
     charactersRead = 0;
-    nextCharBuff = EOF;
     autoDelete = true;
 }
 
@@ -352,25 +351,13 @@ BaseCryptStream::~BaseCryptStream()
 bool BaseCryptStream::reset()
 {
     charactersRead = 0;
-    nextCharBuff = EOF;
+    purgeBuffer();
     return str->reset();
 }
 
-Goffset BaseCryptStream::getPos()
+Goffset BaseCryptStream::getRawPos()
 {
     return charactersRead;
-}
-
-int BaseCryptStream::getChar()
-{
-    // Read next character and empty the buffer, so that a new character will be read next time
-    int c = lookChar();
-    nextCharBuff = EOF;
-
-    if (c != EOF) {
-        charactersRead++;
-    }
-    return c;
 }
 
 bool BaseCryptStream::isBinary(bool last) const
@@ -432,16 +419,11 @@ bool EncryptStream::reset()
     return baseResult;
 }
 
-int EncryptStream::lookChar()
+int EncryptStream::encryptChar()
 {
     unsigned char in[16];
-    int c;
+    int c = EOF;
 
-    if (nextCharBuff != EOF) {
-        return nextCharBuff;
-    }
-
-    c = EOF; // make gcc happy
     switch (algo) {
     case cryptRC4:
         if ((c = str->getChar()) != EOF) {
@@ -474,20 +456,26 @@ int EncryptStream::lookChar()
     case cryptNone:
         break;
     }
-    return (nextCharBuff = c);
+
+    if (c != EOF) {
+        charactersRead++;
+    }
+    return c;
 }
 
 //------------------------------------------------------------------------
 // DecryptStream
 //------------------------------------------------------------------------
 
-DecryptStream::DecryptStream(Stream *strA, const unsigned char *fileKey, CryptAlgorithm algoA, int keyLength, Ref refA) : BaseCryptStream(strA, fileKey, algoA, keyLength, refA) { }
+DecryptStream::DecryptStream(Stream *strA, const unsigned char *fileKey, CryptAlgorithm algoA, int keyLength, Ref refA) : BaseCryptStream(strA, fileKey, algoA, keyLength, refA)
+{
+    eof = false;
+}
 
 DecryptStream::~DecryptStream() = default;
 
 bool DecryptStream::reset()
 {
-    int i;
     bool baseResult = BaseCryptStream::reset();
 
     switch (algo) {
@@ -497,35 +485,30 @@ bool DecryptStream::reset()
         break;
     case cryptAES:
         aesKeyExpansion(&state.aes, objKey, objKeyLength, true);
-        for (i = 0; i < 16; ++i) {
-            state.aes.cbc[i] = str->getChar();
-        }
+        str->doGetChars(16, state.aes.cbc);
         state.aes.bufIdx = 16;
         break;
     case cryptAES256:
         aes256KeyExpansion(&state.aes256, objKey, objKeyLength, true);
-        for (i = 0; i < 16; ++i) {
-            state.aes256.cbc[i] = str->getChar();
-        }
+        str->doGetChars(16, state.aes256.cbc);
         state.aes256.bufIdx = 16;
         break;
     case cryptNone:
         break;
     }
+    eof = false;
 
     return baseResult;
 }
 
-int DecryptStream::lookChar()
+int DecryptStream::decryptChar()
 {
     unsigned char in[16];
-    int c;
-
-    if (nextCharBuff != EOF) {
-        return nextCharBuff;
+    int c = EOF;
+    if (eof) {
+        return c;
     }
 
-    c = EOF; // make gcc happy
     switch (algo) {
     case cryptRC4:
         if ((c = str->getChar()) != EOF) {
@@ -559,7 +542,13 @@ int DecryptStream::lookChar()
     case cryptNone:
         break;
     }
-    return (nextCharBuff = c);
+    if (c == EOF) {
+        eof = true;
+    } else {
+        charactersRead++;
+    }
+
+    return c;
 }
 
 //------------------------------------------------------------------------
@@ -612,13 +601,7 @@ static bool aesReadBlock(Stream *str, unsigned char *in, bool addPadding)
 {
     int c, i;
 
-    for (i = 0; i < 16; ++i) {
-        if ((c = str->getChar()) != EOF) {
-            in[i] = (unsigned char)c;
-        } else {
-            break;
-        }
-    }
+    i = str->doGetChars(16, in);
 
     if (i == 16) {
         return true;
