@@ -946,8 +946,8 @@ bool FormWidgetSignature::createSignature(Object &vObj, Ref vRef, const GooStrin
     bObj.arrayAdd(Object(static_cast<long long>(9999999999LL)));
     bObj.arrayAdd(Object(static_cast<long long>(9999999999LL)));
     vObj.dictAdd("ByteRange", bObj.copy());
-    obj.dictSet("V", Object(vRef));
-    xref->setModifiedObject(&obj, ref);
+    field->getObj()->dictSet("V", Object(vRef));
+    xref->setModifiedObject(field->getObj(), field->getRef());
     return true;
 }
 
@@ -1009,7 +1009,13 @@ FormField::FormField(PDFDoc *docA, Object &&aobj, const Ref aref, FormField *par
                 // Field child: it could be a form field or a widget or composed dict
                 const Object &objParent = childObj.dictLookupNF("Parent");
                 Object obj3 = childObj.dictLookup("Parent");
-                if (objParent.isRef() || obj3.isDict()) {
+                bool hasParent = objParent.isRef() || obj3.isDict();
+                bool isWidget = childObj.dictLookup("Subtype").isName("Widget");
+                Object obj2 = childObj.dictLookup("FT");
+                bool hasFT = obj2.isName() && (obj2.isName("Btn") || obj2.isName("Tx") || obj2.isName("Ch") || obj2.isName("Sig"));
+                bool isComposedWidget = isWidget && hasFT;
+                bool isPureWidget = isWidget && !isComposedWidget;
+                if (hasParent && !isPureWidget) {
                     // Child is a form field or composed dict
                     // We create the field, if it's composed
                     // it will create the widget as a child
@@ -1022,16 +1028,21 @@ FormField::FormField(PDFDoc *docA, Object &&aobj, const Ref aref, FormField *par
                     }
 
                     children.push_back(Form::createFieldFromDict(std::move(childObj), doc, childRef, this, &usedParentsAux));
-                } else {
-                    Object obj2 = childObj.dictLookup("Subtype");
-                    if (obj2.isName("Widget")) {
-                        // Child is a widget annotation
-                        if (!terminal && !children.empty()) {
-                            error(errSyntaxWarning, -1, "Field can't have both Widget AND Field as kids");
-                            continue;
+                } else if (isPureWidget) {
+                    if (hasParent) {
+                        // PDF 1.7 wrt 1.4 introduced "Parent" for Widget Annotations, this is
+                        // such a case so let's validate the Parent just for warning purposes
+                        bool parentOK = (objParent.isRef() && objParent.getRef() == ref) || (obj3.isDict() && &obj3 == &obj);
+                        if (!parentOK) {
+                            error(errSyntaxWarning, -1, "Widget Annotation's Parent entry not pointing to its parent FormField");
                         }
-                        _createWidget(&childObj, childRef);
                     }
+                    // Child is a widget annotation
+                    if (!terminal && !children.empty()) {
+                        error(errSyntaxWarning, -1, "Field can't have both Widget AND Field as kids");
+                        continue;
+                    }
+                    _createWidget(&childObj, childRef);
                 }
             }
         }
