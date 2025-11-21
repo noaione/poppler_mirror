@@ -214,7 +214,7 @@ GpgSignatureBackend::GpgSignatureBackend()
     GpgME::initializeLibrary();
 }
 
-std::unique_ptr<CryptoSign::SigningInterface> GpgSignatureBackend::createSigningHandler(const std::string &certID, HashAlgorithm /*digestAlgTag*/)
+std::unique_ptr<CryptoSign::SigningInterface> GpgSignatureBackend::createSigningHandler(const std::string &certID, HashAlgorithm /*digestAlgTag*/, const std::string &timestampServer)
 {
     return std::make_unique<GpgSignatureCreation>(certID);
 }
@@ -224,6 +224,7 @@ std::unique_ptr<CryptoSign::VerificationInterface> GpgSignatureBackend::createVe
     switch (type) {
     case CryptoSign::SignatureType::unknown_signature_type:
     case CryptoSign::SignatureType::unsigned_signature_field:
+    case CryptoSign::SignatureType::ETSI_RFC3161:
         return {};
     case CryptoSign::SignatureType::ETSI_CAdES_detached:
     case CryptoSign::SignatureType::adbe_pkcs7_detached:

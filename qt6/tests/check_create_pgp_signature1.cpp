@@ -125,10 +125,10 @@ void TestSignWithGnupgPgp::testPgpSignVerify()
 
     QTemporaryDir d;
 
-    auto signingResult =
-            doc->sign(std::string { d.filePath(QStringLiteral("signedFile.pdf")).toStdString() }, std::string { "36E39802E4F49A259091DA69381B80FEF3535BC1" }, std::string {}, std::make_unique<GooString>("newSignatureFieldName"), /*page*/ 1,
-                      /*rect */ { 0, 0, 0, 0 }, /*signatureText*/ {}, /*signatureTextLeft*/ {}, /*fontSize */ 0, /*leftFontSize*/ 0,
-                      /*fontColor*/ {}, /*borderWidth*/ 0, /*borderColor*/ {}, /*backgroundColor*/ {}, /*reason*/ {}, /* location */ nullptr, /* image path */ "", {}, {});
+    auto signingResult = doc->sign(std::string { d.filePath(QStringLiteral("signedFile.pdf")).toStdString() }, std::string { "36E39802E4F49A259091DA69381B80FEF3535BC1" }, std::string {}, {},
+                                   std::make_unique<GooString>("newSignatureFieldName"), /*page*/ 1,
+                                   /*rect */ { 0, 0, 0, 0 }, /*signatureText*/ {}, /*signatureTextLeft*/ {}, /*fontSize */ 0, /*leftFontSize*/ 0,
+                                   /*fontColor*/ {}, /*borderWidth*/ 0, /*borderColor*/ {}, /*backgroundColor*/ {}, /*reason*/ {}, /* location */ nullptr, /* image path */ "", {}, {});
 
     auto activeBackendType = CryptoSign::Factory::getActive();
     if (activeBackendType == CryptoSign::Backend::Type::NSS3) {

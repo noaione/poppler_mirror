@@ -210,6 +210,8 @@ static bool addNewSignature = false;
 static bool useAIACertFetch = false;
 static GooString newSignatureFieldName;
 static char assertSigner[256] = "";
+static bool addDocTimestamp = false;
+static char timestampServer[256] = "";
 
 static const ArgDesc argDesc[] = {
     { "-nssdir", argGooString, &nssDir, 0, "path to directory of libnss3 database" },
@@ -223,12 +225,14 @@ static const ArgDesc argDesc[] = {
       "be given or listed in compact format (no colons or spaces in between). If fpr_or_file specifies a file, empty lines are ignored as well as all lines starting with a hash sign. Only available for GnuPG backend." },
     { "-dump", argFlag, &dumpSignatures, 0, "dump all signatures into current directory" },
     { "-add-signature", argFlag, &addNewSignature, 0, "adds a new signature to the document" },
+    { "-add-document-timestamp", argFlag, &addDocTimestamp, 0, "adds a document timestamp" },
     { "-new-signature-field-name", argGooString, &newSignatureFieldName, 0, "field name used for the newly added signature. A random ID will be used if empty" },
     { "-sign", argString, &signatureName, 256, "sign the document in the given signature field (by name or number)" },
     { "-etsi", argFlag, &etsiCAdESdetached, 0, "create a signature of type ETSI.CAdES.detached instead of adbe.pkcs7.detached" },
     { "-backend", argString, &backendString, 256, "use given backend for signing/verification" },
     { "-enable-pgp", argFlag, &allowPgp, 0, "Enable pgp signatures in the GnuPG backend. Only available for GnuPG backend" },
     { "-nick", argString, &certNickname, 256, "use the certificate with the given nickname/fingerprint for signing" },
+    { "-timestamp-server", argString, &timestampServer, 256, "timestamp server URL" },
     { "-kpw", argString, &password, 256, "password for the signing key (might be missing if the key isn't password protected)" },
     { "-digest", argString, &digestName, 256, "name of the digest algorithm (default: SHA256)" },
     { "-reason", argGooString, &reason, 0, "reason for signing (default: no reason given)" },
@@ -523,9 +527,44 @@ int main(int argc, char *argv[])
         }
 
         // We don't provide a way to customize the UI from pdfsig for now
-        const auto failure = doc->sign(std::string { argv[2] }, std::string { certNickname }, std::string { password }, newSignatureFieldName.copy(), /*page*/ 1,
+        const auto failure = doc->sign(std::string { argv[2] }, std::string { certNickname }, std::string { timestampServer }, std::string { password }, newSignatureFieldName.copy(), /*page*/ 1,
                                        /*rect */ { 0, 0, 0, 0 }, /*signatureText*/ {}, /*signatureTextLeft*/ {}, /*fontSize */ 0, /*leftFontSize*/ 0,
                                        /*fontColor*/ {}, /*borderWidth*/ 0, /*borderColor*/ {}, /*backgroundColor*/ {}, rs.get(), /* location */ nullptr, /* image path */ "", ownerPW, userPW);
+        return !failure.has_value() ? 0 : 3;
+    }
+
+    if (addDocTimestamp) {
+        if (argc == 2) {
+            fprintf(stderr, "An output filename for the timestamped document must be given\n");
+            return 2;
+        }
+
+        if (digestName != std::string("SHA256")) {
+            printf("Only digest SHA256 is supported at the moment with -add-document-timestamp\n");
+            printf("Please file a bug report if this is important for you\n");
+            return 2;
+        }
+
+        if (doc->getPage(1) == nullptr) {
+            printf("Error getting first page of the document.\n");
+            return 2;
+        }
+
+        if (newSignatureFieldName.empty()) {
+            // Create a random field name, it could be anything but 32 hex numbers should
+            // hopefully give us something that is not already in the document
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> distrib(1, 15);
+            for (int i = 0; i < 32; ++i) {
+                const int value = distrib(gen);
+                newSignatureFieldName.append(value < 10 ? 48 + value : 65 + (value - 10));
+            }
+        }
+
+        const auto failure = doc->sign(std::string { argv[2] }, std::string { certNickname }, std::string { timestampServer }, std::string { password }, newSignatureFieldName.copy(), /*page*/ 1,
+                                       /*rect */ { 0, 0, 0, 0 }, /*signatureText*/ {}, /*signatureTextLeft*/ {}, /*fontSize */ 0, /*leftFontSize*/ 0,
+                                       /*fontColor*/ {}, /*borderWidth*/ 0, /*borderColor*/ {}, /*backgroundColor*/ {}, {}, /* location */ nullptr, /* image path */ "", ownerPW, userPW);
         return !failure.has_value() ? 0 : 3;
     }
 
@@ -605,7 +644,7 @@ int main(int argc, char *argv[])
 #endif
         FormWidgetSignature *fws = static_cast<FormWidgetSignature *>(ffs->getWidget(0));
         auto backend = CryptoSign::Factory::createActive();
-        auto sigHandler = backend->createSigningHandler(certNickname, HashAlgorithm::Sha256);
+        auto sigHandler = backend->createSigningHandler(certNickname, HashAlgorithm::Sha256, {});
         std::unique_ptr<X509CertificateInfo> certInfo = sigHandler->getCertificateInfo();
         if (!certInfo) {
             fprintf(stderr, "signDocument: error getting signature info\n");
@@ -617,7 +656,8 @@ int main(int argc, char *argv[])
         const std::string signatureText(GooString::format(_("Digitally signed by {0:s}"), signerName.c_str()) + "\n" + GooString::format(_("Date: {0:s}"), timestamp.c_str()));
         const auto gSignatureText = std::make_unique<GooString>((signatureText.empty() || noAppearance) ? "" : utf8ToUtf16WithBom(signatureText));
         const auto gSignatureLeftText = std::make_unique<GooString>((signerName.empty() || noAppearance) ? "" : utf8ToUtf16WithBom(signerName));
-        const auto failure = fws->signDocumentWithAppearance(argv[2], std::string { certNickname }, std::string { password }, rs.get(), nullptr, {}, {}, *gSignatureText, *gSignatureLeftText, 0, 0, std::make_unique<AnnotColor>(blackColor));
+        const auto failure = fws->signDocumentWithAppearance(argv[2], std::string { certNickname }, std::string { timestampServer }, std::string { password }, rs.get(), nullptr, {}, {}, *gSignatureText, *gSignatureLeftText, 0, 0,
+                                                             std::make_unique<AnnotColor>(blackColor));
         return !failure.has_value() ? 0 : 3;
     }
 
@@ -727,6 +767,9 @@ int main(int argc, char *argv[])
             break;
         case CryptoSign::SignatureType::g10c_pgp_signature_detached:
             printf("g10c.pgp.signature.detached\n");
+            break;
+        case CryptoSign::SignatureType::ETSI_RFC3161:
+            printf("ETSI.RFC3161\n");
             break;
         case CryptoSign::SignatureType::unknown_signature_type:
         case CryptoSign::SignatureType::unsigned_signature_field: /*shouldn't happen*/

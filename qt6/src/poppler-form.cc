@@ -814,7 +814,7 @@ bool CertificateInfo::checkPassword(const QString &password) const
         return false;
     }
     Q_D(const CertificateInfo);
-    auto sigHandler = backend->createSigningHandler(d->nick_name.toStdString(), HashAlgorithm::Sha256);
+    auto sigHandler = backend->createSigningHandler(d->nick_name.toStdString(), HashAlgorithm::Sha256, {});
     unsigned char buffer[5];
     memcpy(buffer, "test", 5);
     sigHandler->addData(buffer, 5);
@@ -989,6 +989,7 @@ FormFieldSignature::SignatureType FormFieldSignature::signatureType() const
         sigType = EtsiCAdESdetached;
         break;
     case CryptoSign::SignatureType::unknown_signature_type:
+    case CryptoSign::SignatureType::ETSI_RFC3161:
         sigType = UnknownSignatureType;
         break;
     case CryptoSign::SignatureType::g10c_pgp_signature_detached:
@@ -1219,12 +1220,14 @@ FormFieldSignature::SigningResult FormFieldSignature::sign(const QString &output
     const auto gSignatureText = std::unique_ptr<GooString>(QStringToUnicodeGooString(data.signatureText()));
     const auto gSignatureLeftText = std::unique_ptr<GooString>(QStringToUnicodeGooString(data.signatureLeftText()));
 
-    const auto failure = fws->signDocumentWithAppearance(outputFileName.toStdString(), data.certNickname().toStdString(), data.password().toStdString(), reason.get(), location.get(), ownerPwd, userPwd, *gSignatureText, *gSignatureLeftText,
-                                                         data.fontSize(), data.leftFontSize(), convertQColor(data.fontColor()), data.borderWidth(), convertQColor(data.borderColor()), convertQColor(data.backgroundColor()));
+    const auto failure =
+            fws->signDocumentWithAppearance(outputFileName.toStdString(), data.certNickname().toStdString(), {}, data.password().toStdString(), reason.get(), location.get(), ownerPwd, userPwd, *gSignatureText, *gSignatureLeftText,
+                                            data.fontSize(), data.leftFontSize(), convertQColor(data.fontColor()), data.borderWidth(), convertQColor(data.borderColor()), convertQColor(data.backgroundColor()));
     if (failure) {
         m_formData->lastSigningErrorDetails = fromPopplerCore(failure.value().message);
         switch (failure.value().type) {
         case CryptoSign::SigningError::GenericError:
+        case CryptoSign::SigningError::TimestampError:
             return GenericSigningError;
         case CryptoSign::SigningError::InternalError:
             return InternalError;

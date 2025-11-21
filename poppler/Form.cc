@@ -611,28 +611,32 @@ static bool hashFileRange(FILE *f, CryptoSign::SigningInterface *handler, Goffse
     return true;
 }
 
-std::optional<CryptoSign::SigningErrorMessage> FormWidgetSignature::signDocument(const std::string &saveFilename, const std::string &certNickname, const std::string &password, const GooString *reason, const GooString *location,
-                                                                                 const std::optional<GooString> &ownerPassword, const std::optional<GooString> &userPassword)
+std::optional<CryptoSign::SigningErrorMessage> FormWidgetSignature::signDocument(const std::string &saveFilename, const std::string &certNickname, const std::string &timestampServer, const std::string &password, const GooString *reason,
+                                                                                 const GooString *location, const std::optional<GooString> &ownerPassword, const std::optional<GooString> &userPassword)
 {
     auto backend = CryptoSign::Factory::createActive();
     if (!backend) {
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::InternalError, ERROR_IN_CODE_LOCATION };
     }
-    if (certNickname.empty()) {
+    if (certNickname.empty() && timestampServer.empty()) {
         error(errInternal, -1, "signDocument: Empty nickname");
         return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::KeyMissing, ERROR_IN_CODE_LOCATION };
     }
 
-    auto sigHandler = backend->createSigningHandler(certNickname, HashAlgorithm::Sha256);
+    auto sigHandler = backend->createSigningHandler(certNickname, HashAlgorithm::Sha256, timestampServer);
 
     FormFieldSignature *signatureField = static_cast<FormFieldSignature *>(field);
-    std::unique_ptr<X509CertificateInfo> certInfo = sigHandler->getCertificateInfo();
-    if (!certInfo) {
-        error(errInternal, -1, "signDocument: error getting signature info");
-        return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::KeyMissing, ERROR_IN_CODE_LOCATION };
+
+    std::string signerName {};
+    if (!certNickname.empty()) {
+        std::unique_ptr<X509CertificateInfo> certInfo = sigHandler->getCertificateInfo();
+        if (!certInfo) {
+            error(errInternal, -1, "signDocument: error getting signature info");
+            return CryptoSign::SigningErrorMessage { CryptoSign::SigningError::KeyMissing, ERROR_IN_CODE_LOCATION };
+        }
+        signerName = certInfo->getSubjectInfo().commonName;
+        signatureField->setCertificateInfo(certInfo);
     }
-    const std::string signerName = certInfo->getSubjectInfo().commonName;
-    signatureField->setCertificateInfo(certInfo);
     updateWidgetAppearance(); // add visible signing info to appearance
 
     Object vObj(new Dict(xref));
@@ -720,8 +724,8 @@ static std::tuple<double, double> calculateDxDy(int rot, const PDFRectangle *rec
     }
 }
 
-std::optional<CryptoSign::SigningErrorMessage> FormWidgetSignature::signDocumentWithAppearance(const std::string &saveFilename, const std::string &certNickname, const std::string &password, const GooString *reason,
-                                                                                               const GooString *location, const std::optional<GooString> &ownerPassword, const std::optional<GooString> &userPassword,
+std::optional<CryptoSign::SigningErrorMessage> FormWidgetSignature::signDocumentWithAppearance(const std::string &saveFilename, const std::string &certNickname, const std::string &timestampServer, const std::string &password,
+                                                                                               const GooString *reason, const GooString *location, const std::optional<GooString> &ownerPassword, const std::optional<GooString> &userPassword,
                                                                                                const GooString &signatureText, const GooString &signatureTextLeft, double fontSize, double leftFontSize,
                                                                                                std::unique_ptr<AnnotColor> &&fontColor, double borderWidth, std::unique_ptr<AnnotColor> &&borderColor,
                                                                                                std::unique_ptr<AnnotColor> &&backgroundColor)
@@ -782,7 +786,7 @@ std::optional<CryptoSign::SigningErrorMessage> FormWidgetSignature::signDocument
     // say that there a now signatures and that we should append only
     doc->getCatalog()->getAcroForm()->dictSet("SigFlags", Object(3));
 
-    auto signingResult = signDocument(saveFilename, certNickname, password, reason, location, ownerPassword, userPassword);
+    auto signingResult = signDocument(saveFilename, certNickname, timestampServer, password, reason, location, ownerPassword, userPassword);
 
     // Now bring back the annotation appearance back to what it was
     ffs->setDefaultAppearance(originalDefaultAppearance);
@@ -926,11 +930,15 @@ bool FormWidgetSignature::updateSignature(FILE *f, Goffset sigStart, Goffset sig
 
 bool FormWidgetSignature::createSignature(Object &vObj, Ref vRef, const GooString &name, int placeholderLength, const GooString *reason, const GooString *location, CryptoSign::SignatureType signatureType)
 {
-    vObj.dictAdd("Type", Object(objName, "Sig"));
+    if (signatureType == CryptoSign::SignatureType::ETSI_RFC3161) {
+        vObj.dictAdd("Type", Object(objName, "DocTimeStamp"));
+    } else {
+        vObj.dictAdd("Type", Object(objName, "Sig"));
+        vObj.dictAdd("M", Object(timeToDateString(nullptr)));
+        vObj.dictAdd("Name", Object(name.copy()));
+    }
     vObj.dictAdd("Filter", Object(objName, "Adobe.PPKLite"));
     vObj.dictAdd("SubFilter", Object(objName, toStdString(signatureType).c_str()));
-    vObj.dictAdd("Name", Object(name.copy()));
-    vObj.dictAdd("M", Object(timeToDateString(nullptr)));
     if (reason && !reason->empty()) {
         vObj.dictAdd("Reason", Object(reason->copy()));
     }
@@ -2299,6 +2307,7 @@ void FormFieldSignature::parseInfo()
         case CryptoSign::SignatureType::adbe_pkcs7_sha1:
         case CryptoSign::SignatureType::adbe_pkcs7_detached:
         case CryptoSign::SignatureType::ETSI_CAdES_detached:
+        case CryptoSign::SignatureType::ETSI_RFC3161:
         case CryptoSign::SignatureType::g10c_pgp_signature_detached:
             signature_info->setSubFilterSupport(true);
             break;
