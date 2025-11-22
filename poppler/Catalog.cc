@@ -1312,7 +1312,6 @@ GfxLCMSProfilePtr Catalog::getDisplayProfile()
 std::shared_ptr<GfxXYZ2DisplayTransforms> Catalog::getXYZ2DisplayTransforms()
 {
     if (!XYZ2DisplayTransforms) {
-
         GfxLCMSProfilePtr profile = getDisplayProfile();
         catalogLocker();
 
