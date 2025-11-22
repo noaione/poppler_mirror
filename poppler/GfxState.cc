@@ -41,6 +41,7 @@
 // Copyright (C) 2025, 2026 g10 Code GmbH, Author: Sune Stolborg Vuorela <sune@vuorela.dk>
 // Copyright (C) 2025 Trystan Mata <trystan.mata@tytanium.xyz>
 // Copyright (C) 2025 Arnav V <arnav0872@gmail.com>
+// Copyright (C) 2025 noaione <noaione@n4o.xyz>
 // Copyright (C) 2026 Adam Sampson <ats@offog.org>
 //
 // To see a description of the changes please see the Changelog file that
@@ -52,6 +53,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <cstddef>
 #include <cmath>
 #include <cstring>
@@ -397,12 +399,8 @@ static void CMSError(cmsContext /*contextId*/, cmsUInt32Number /*ecode*/, const 
 
 static void setCMSErrorHandler()
 {
-    static bool installed = false;
-
-    if (!installed) {
-        cmsSetLogErrorHandler(CMSError);
-        installed = true;
-    }
+    static std::once_flag flag;
+    std::call_once(flag, []() { cmsSetLogErrorHandler(CMSError); });
 }
 
 unsigned int getCMSColorSpaceType(cmsColorSpaceSignature cs)
@@ -6286,12 +6284,13 @@ GfxLCMSProfilePtr GfxXYZ2DisplayTransforms::XYZProfile = nullptr;
 
 GfxXYZ2DisplayTransforms::GfxXYZ2DisplayTransforms(const GfxLCMSProfilePtr &displayProfileA)
 {
-    if (!XYZProfile) {
+    static std::once_flag cmsInitFlag;
+    std::call_once(cmsInitFlag, []() {
         // This is probably the one of the first invocations of lcms2, so we set the error handler
         setCMSErrorHandler();
 
         XYZProfile = make_GfxLCMSProfilePtr(cmsCreateXYZProfile());
-    }
+    });
 
     displayProfile = displayProfileA;
     if (displayProfile) {
@@ -6488,12 +6487,13 @@ GfxState::GfxState(double hDPIA, double vDPIA, const PDFRectangle *pageBox, int 
     localDisplayProfile = nullptr;
     XYZ2DisplayTransforms = std::make_shared<GfxXYZ2DisplayTransforms>(nullptr);
 
-    if (!sRGBProfile) {
-        // This is probably the one of the first invocations of lcms2, so we set the error handler
+    static std::once_flag sRGBProfileOnceFlag;
+    std::call_once(sRGBProfileOnceFlag, []() {
+        // This is probably the one of the first invocations of lcms2, so we
         setCMSErrorHandler();
 
         sRGBProfile = make_GfxLCMSProfilePtr(cmsCreate_sRGBProfile());
-    }
+    });
 #endif
 }
 
