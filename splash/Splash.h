@@ -284,6 +284,8 @@ private:
     static void transform(const std::array<double, 6> &matrix, double xi, double yi, double *xo, double *yo);
     void strokeNarrow(const SplashPath &path);
     void strokeWide(const SplashPath &path, double w);
+    void strokeHairline(const SplashPath &path);
+    void drawHairlinePixel(SplashPipe *pipe, int x, int y, unsigned char alpha, bool noClip);
     static std::unique_ptr<SplashPath> flattenPath(const SplashPath &path, const std::array<double, 6> &matrix, double flatness);
     static void flattenCurve(double x0, double y0, double x1, double y1, double x2, double y2, double x3, double y3, const std::array<double, 6> &matrix, double flatness2, SplashPath *fPath);
     std::unique_ptr<SplashPath> makeDashedPath(const SplashPath &xPath);
