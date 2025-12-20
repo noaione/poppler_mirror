@@ -276,6 +276,8 @@ private:
     void drawAALine(SplashPipe *pipe, int x0, int x1, int y, bool adjustLine = false, unsigned char lineOpacity = 0);
     static void transform(const std::array<SplashCoord, 6> &matrix, SplashCoord xi, SplashCoord yi, SplashCoord *xo, SplashCoord *yo);
     void strokeNarrow(const SplashPath &path);
+    void strokeHairline(const SplashPath &path);
+    void drawHairlinePixel(SplashPipe *pipe, int x, int y, unsigned char alpha, bool noClip);
     void strokeWide(const SplashPath &path, SplashCoord w);
     static std::unique_ptr<SplashPath> flattenPath(const SplashPath &path, const std::array<SplashCoord, 6> &matrix, SplashCoord flatness);
     static void flattenCurve(SplashCoord x0, SplashCoord y0, SplashCoord x1, SplashCoord y1, SplashCoord x2, SplashCoord y2, SplashCoord x3, SplashCoord y3, const std::array<SplashCoord, 6> &matrix, SplashCoord flatness2,

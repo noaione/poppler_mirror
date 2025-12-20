@@ -1903,7 +1903,12 @@ SplashError Splash::stroke(const SplashPath &path)
         }
     } else {
         if (state->lineWidth == 0) {
-            strokeNarrow(*path2);
+            // choose between hairline (vector AA) and narrow (no AA) based on mode
+            if (vectorAntialias) {
+                strokeHairline(*path2);
+            } else {
+                strokeNarrow(*path2);
+            }
         } else {
             strokeWide(*path2, state->lineWidth);
         }
@@ -1998,6 +2003,164 @@ void Splash::strokeNarrow(const SplashPath &path)
         opClipRes = splashClipAllInside;
     } else {
         opClipRes = splashClipAllOutside;
+    }
+}
+
+// Alternative way to draw zero width line with anti-aliasing
+void Splash::strokeHairline(const SplashPath &path)
+{
+    SplashPipe pipe;
+    SplashXPathSeg *seg;
+    int nClipRes[3];
+    int i;
+
+    nClipRes[0] = nClipRes[1] = nClipRes[2] = 0;
+
+    SplashXPath xPath(path, state->matrix, state->flatness, false);
+
+    pipeInit(&pipe, 0, 0, state->strokePattern, nullptr,
+             (unsigned char)splashRound(state->strokeAlpha * 255), false, false);
+
+    for (i = 0, seg = xPath.segs; i < xPath.length; ++i, ++seg) {
+        SplashCoord x0 = seg->x0;
+        SplashCoord y0 = seg->y0;
+        SplashCoord x1 = seg->x1;
+        SplashCoord y1 = seg->y1;
+
+        int xMin = splashFloor(x0 < x1 ? x0 : x1);
+        int xMax = splashFloor(x0 > x1 ? x0 : x1);
+        int yMin = splashFloor(y0 < y1 ? y0 : y1);
+        int yMax = splashFloor(y0 > y1 ? y0 : y1);
+
+        SplashClipResult clipRes = state->clip->testRect(xMin, yMin, xMax, yMax);
+        if (clipRes == splashClipAllOutside) {
+            ++nClipRes[clipRes];
+            continue;
+        }
+
+        SplashCoord dx = x1 - x0;
+        SplashCoord dy = y1 - y0;
+
+        bool steep = splashAbs(dy) > splashAbs(dx);
+
+        if (steep) {
+            SplashCoord tmp;
+            tmp = x0; x0 = y0; y0 = tmp;
+            tmp = x1; x1 = y1; y1 = tmp;
+            tmp = dx; dx = dy; dy = tmp;
+        }
+
+        if (x0 > x1) {
+            SplashCoord tmp;
+            tmp = x0; x0 = x1; x1 = tmp;
+            tmp = y0; y0 = y1; y1 = tmp;
+        }
+
+        SplashCoord gradient = (dx == 0) ? 1.0 : dy / dx;
+
+        int xpxl1 = splashRound(x0);
+        SplashCoord yend = y0 + gradient * (xpxl1 - x0);
+        SplashCoord xgap = 1.0 - (x0 + 0.5 - splashFloor(x0 + 0.5));
+        int ypxl1 = splashFloor(yend);
+
+        if (steep) {
+            unsigned char alpha1 = (unsigned char)splashRound((1.0 - (yend - ypxl1)) * xgap * 255);
+            unsigned char alpha2 = (unsigned char)splashRound((yend - ypxl1) * xgap * 255);
+            if (alpha1 > 0) {
+                drawHairlinePixel(&pipe, ypxl1, xpxl1, alpha1, clipRes == splashClipAllInside);
+            }
+            if (alpha2 > 0) {
+                drawHairlinePixel(&pipe, ypxl1 + 1, xpxl1, alpha2, clipRes == splashClipAllInside);
+            }
+        } else {
+            unsigned char alpha1 = (unsigned char)splashRound((1.0 - (yend - ypxl1)) * xgap * 255);
+            unsigned char alpha2 = (unsigned char)splashRound((yend - ypxl1) * xgap * 255);
+            if (alpha1 > 0) {
+                drawHairlinePixel(&pipe, xpxl1, ypxl1, alpha1, clipRes == splashClipAllInside);
+            }
+            if (alpha2 > 0) {
+                drawHairlinePixel(&pipe, xpxl1, ypxl1 + 1, alpha2, clipRes == splashClipAllInside);
+            }
+        }
+
+        SplashCoord intery = yend + gradient;
+
+        int xpxl2 = splashRound(x1);
+        yend = y1 + gradient * (xpxl2 - x1);
+        xgap = (x1 + 0.5) - splashFloor(x1 + 0.5);
+        int ypxl2 = splashFloor(yend);
+
+        if (steep) {
+            unsigned char alpha1 = (unsigned char)splashRound((1.0 - (yend - ypxl2)) * xgap * 255);
+            unsigned char alpha2 = (unsigned char)splashRound((yend - ypxl2) * xgap * 255);
+            if (alpha1 > 0) {
+                drawHairlinePixel(&pipe, ypxl2, xpxl2, alpha1, clipRes == splashClipAllInside);
+            }
+            if (alpha2 > 0) {
+                drawHairlinePixel(&pipe, ypxl2 + 1, xpxl2, alpha2, clipRes == splashClipAllInside);
+            }
+        } else {
+            unsigned char alpha1 = (unsigned char)splashRound((1.0 - (yend - ypxl2)) * xgap * 255);
+            unsigned char alpha2 = (unsigned char)splashRound((yend - ypxl2) * xgap * 255);
+            if (alpha1 > 0) {
+                drawHairlinePixel(&pipe, xpxl2, ypxl2, alpha1, clipRes == splashClipAllInside);
+            }
+            if (alpha2 > 0) {
+                drawHairlinePixel(&pipe, xpxl2, ypxl2 + 1, alpha2, clipRes == splashClipAllInside);
+            }
+        }
+
+        for (int x = xpxl1 + 1; x < xpxl2; ++x) {
+            int iy = splashFloor(intery);
+            SplashCoord frac = intery - iy;
+            unsigned char alpha1 = (unsigned char)splashRound((1.0 - frac) * 255);
+            unsigned char alpha2 = (unsigned char)splashRound(frac * 255);
+
+            if (steep) {
+                if (alpha1 > 0) {
+                    drawHairlinePixel(&pipe, iy, x, alpha1, clipRes == splashClipAllInside);
+                }
+                if (alpha2 > 0) {
+                    drawHairlinePixel(&pipe, iy + 1, x, alpha2, clipRes == splashClipAllInside);
+                }
+            } else {
+                if (alpha1 > 0) {
+                    drawHairlinePixel(&pipe, x, iy, alpha1, clipRes == splashClipAllInside);
+                }
+                if (alpha2 > 0) {
+                    drawHairlinePixel(&pipe, x, iy + 1, alpha2, clipRes == splashClipAllInside);
+                }
+            }
+            intery += gradient;
+        }
+
+        ++nClipRes[clipRes];
+    }
+
+    if (nClipRes[splashClipPartial] || (nClipRes[splashClipAllInside] && nClipRes[splashClipAllOutside])) {
+        opClipRes = splashClipPartial;
+    } else if (nClipRes[splashClipAllInside]) {
+        opClipRes = splashClipAllInside;
+    } else {
+        opClipRes = splashClipAllOutside;
+    }
+}
+
+// Draw a single pixel with specified alpha for hairline strokes
+void Splash::drawHairlinePixel(SplashPipe *pipe, int x, int y, unsigned char alpha, bool noClip)
+{
+    if (x < 0 || x >= bitmap->width || y < 0 || y >= bitmap->height) {
+        return;
+    }
+
+    if (noClip || state->clip->test(x, y)) {
+        pipeSetXY(pipe, x, y);
+        unsigned char origShape = pipe->shape;
+        pipe->shape = div255((int)origShape * (int)alpha);
+        if (pipe->shape > 0) {
+            (this->*pipe->run)(pipe);
+        }
+        pipe->shape = origShape;
     }
 }
 
