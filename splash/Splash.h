@@ -257,6 +257,8 @@ public:
     // Draw a gouraud triangle shading.
     bool gouraudTriangleShadedFill(SplashGouraudColor *shading);
 
+    SplashZeroWidthLineMode getZeroWidthLineMode() { return zeroWidthLineMode; }
+    void setZeroWidthLineMode(SplashZeroWidthLineMode zeroWidthLineModeA) { zeroWidthLineMode = zeroWidthLineModeA; }
 private:
     void pipeInit(SplashPipe *pipe, int x, int y, SplashPattern *pattern, SplashColorPtr cSrc, unsigned char aInput, bool usesShape, bool nonIsolatedGroup, bool knockout = false, unsigned char knockoutOpacity = 255);
     void pipeRun(SplashPipe *pipe);
@@ -330,6 +332,7 @@ private:
     double aaGamma[splashAASize * splashAASize + 1];
     double minLineWidth;
     SplashThinLineMode thinLineMode;
+    SplashZeroWidthLineMode zeroWidthLineMode;
     SplashClipResult opClipRes;
     SplashBitmap *groupBackBitmap; // backdrop bitmap for knockout/non-isolated groups
     int groupBackX, groupBackY; // offset within groupBackBitmap
