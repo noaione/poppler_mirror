@@ -75,6 +75,14 @@ enum SplashThinLineMode
     splashThinLineSolid, // draw line solid at least with 1 pixel
     splashThinLineShape // draw line shaped at least with 1 pixel
 };
+
+enum SplashZeroWidthLineMode
+{
+    splashZeroWidthLineDefault,  // use default 1px behavior
+    splashZeroWidthLineHairline, // draw zero-width lines as hairlines
+    splashZeroWidthLineNothing   // do not draw zero-width lines
+};
+
 // number of components in each color mode
 // (defined in SplashState.cc)
 extern int splashColorModeNComps[];

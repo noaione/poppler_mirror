@@ -1439,6 +1439,7 @@ Splash::Splash(SplashBitmap *bitmapA, bool vectorAntialiasA, SplashScreenParams 
     }
     minLineWidth = 0;
     thinLineMode = splashThinLineDefault;
+    zeroWidthLineMode = splashZeroWidthLineDefault;
     debugMode = false;
     alpha0Bitmap = nullptr;
 }
@@ -1461,6 +1462,7 @@ Splash::Splash(SplashBitmap *bitmapA, bool vectorAntialiasA, const SplashScreen 
     }
     minLineWidth = 0;
     thinLineMode = splashThinLineDefault;
+    zeroWidthLineMode = splashZeroWidthLineDefault;
     debugMode = false;
     alpha0Bitmap = nullptr;
 }
@@ -1904,9 +1906,9 @@ SplashError Splash::stroke(const SplashPath &path)
     } else {
         if (state->lineWidth == 0) {
             // choose between hairline (vector AA) and narrow (no AA) based on mode
-            if (vectorAntialias) {
+            if (zeroWidthLineMode == splashZeroWidthLineHairline) {
                 strokeHairline(*path2);
-            } else {
+            } else if (zeroWidthLineMode == splashZeroWidthLineDefault) {
                 strokeNarrow(*path2);
             }
         } else {
@@ -2155,12 +2157,9 @@ void Splash::drawHairlinePixel(SplashPipe *pipe, int x, int y, unsigned char alp
 
     if (noClip || state->clip->test(x, y)) {
         pipeSetXY(pipe, x, y);
-        unsigned char origShape = pipe->shape;
-        pipe->shape = div255((int)origShape * (int)alpha);
-        if (pipe->shape > 0) {
-            (this->*pipe->run)(pipe);
-        }
-        pipe->shape = origShape;
+        // Set shape to the anti-aliasing alpha computed by Wu's algorithm
+        pipe->shape = alpha;
+        (this->*pipe->run)(pipe);
     }
 }
 
