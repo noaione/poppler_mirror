@@ -1246,6 +1246,7 @@ SplashOutputDev::SplashOutputDev(SplashColorMode colorModeA, int bitmapRowPadA, 
     splash = new Splash(bitmap, vectorAntialias, &screenParams);
     splash->setMinLineWidth(s_minLineWidth);
     splash->setThinLineMode(thinLineMode);
+    splash->setZeroWidthLineMode(zeroWidthLineMode);
     splash->clear(paperColor, 0);
 
     fontEngine = nullptr;
@@ -1348,6 +1349,7 @@ void SplashOutputDev::startPage(int /*pageNum*/, GfxState *state, XRef *xrefA)
     }
     splash = new Splash(bitmap, vectorAntialias, &screenParams);
     splash->setThinLineMode(thinLineMode);
+    splash->setZeroWidthLineMode(zeroWidthLineMode);
     splash->setMinLineWidth(s_minLineWidth);
     if (state) {
         const std::array<double, 6> &ctm = state->getCTM();
@@ -2516,6 +2518,7 @@ void SplashOutputDev::type3D1(GfxState *state, double /*wx*/, double /*wy*/, dou
     }
     splash->setMinLineWidth(s_minLineWidth);
     splash->setThinLineMode(splashThinLineDefault);
+    splash->setZeroWidthLineMode(splashZeroWidthLineDefault);
     splash->setFillPattern(new SplashSolidColor(color));
     splash->setStrokePattern(new SplashSolidColor(color));
     //~ this should copy other state from t3GlyphStack->origSplash?
@@ -3938,6 +3941,7 @@ void SplashOutputDev::beginTransparencyGroup(GfxState *state, const std::array<d
         fontEngine->setAA(false);
     }
     splash->setThinLineMode(transpGroup->origSplash->getThinLineMode());
+    splash->setZeroWidthLineMode(transpGroup->origSplash->getZeroWidthLineMode());
     splash->setMinLineWidth(s_minLineWidth);
     //~ Acrobat apparently copies at least the fill and stroke colors, and
     //~ maybe other state(?) -- but not the clipping path (and not sure
@@ -4377,6 +4381,7 @@ bool SplashOutputDev::tilingPatternFill(GfxState *state, Gfx *gfxA, Catalog * /*
         splash->clear(paperColor, 0);
     }
     splash->setThinLineMode(formerSplash->getThinLineMode());
+    splash->setZeroWidthLineMode(formerSplash->getZeroWidthLineMode());
     splash->setMinLineWidth(s_minLineWidth);
     if (doFastBlit) {
         // drawImage would colorize the greyscale pattern in tilingBitmapSrc buffer accessor while tiling.
