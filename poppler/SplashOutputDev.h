@@ -343,6 +343,8 @@ public:
     void setFreeTypeHinting(bool enable, bool enableSlightHinting);
     void setEnableFreeType(bool enable) { enableFreeType = enable; }
 
+    SplashZeroWidthLineMode getZeroWidthLineMode() { return zeroWidthLineMode; }
+    void setZeroWidthLineMode(SplashZeroWidthLineMode zeroWidthLineModeA) { zeroWidthLineMode = zeroWidthLineModeA; }
 protected:
     void doUpdateFont(GfxState *state);
 
@@ -384,6 +386,7 @@ private:
     SplashScreenParams screenParams;
     bool skipHorizText;
     bool skipRotatedText;
+    SplashZeroWidthLineMode zeroWidthLineMode;
 
     PDFDoc *doc; // the current document
     XRef *xref; // the xref of the current document
