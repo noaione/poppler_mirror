@@ -2113,10 +2113,10 @@ void Splash::strokeHairline(const SplashPath &path)
     pipeInit(&pipe, 0, 0, state->strokePattern, nullptr, (unsigned char)splashRound(state->strokeAlpha * 255), false, false);
 
     for (i = 0, seg = xPath.segs; i < xPath.length; ++i, ++seg) {
-        SplashCoord x0 = seg->x0;
-        SplashCoord y0 = seg->y0;
-        SplashCoord x1 = seg->x1;
-        SplashCoord y1 = seg->y1;
+        double x0 = seg->x0;
+        double y0 = seg->y0;
+        double x1 = seg->x1;
+        double y1 = seg->y1;
 
         int xMin = splashFloor(x0 < x1 ? x0 : x1);
         int xMax = splashFloor(x0 > x1 ? x0 : x1);
@@ -2129,13 +2129,13 @@ void Splash::strokeHairline(const SplashPath &path)
             continue;
         }
 
-        SplashCoord dx = x1 - x0;
-        SplashCoord dy = y1 - y0;
+        double dx = x1 - x0;
+        double dy = y1 - y0;
 
         bool steep = splashAbs(dy) > splashAbs(dx);
 
         if (steep) {
-            SplashCoord tmp;
+            double tmp;
             tmp = x0;
             x0 = y0;
             y0 = tmp;
@@ -2148,7 +2148,7 @@ void Splash::strokeHairline(const SplashPath &path)
         }
 
         if (x0 > x1) {
-            SplashCoord tmp;
+            double tmp;
             tmp = x0;
             x0 = x1;
             x1 = tmp;
@@ -2157,11 +2157,11 @@ void Splash::strokeHairline(const SplashPath &path)
             y1 = tmp;
         }
 
-        SplashCoord gradient = (dx == 0) ? 1.0 : dy / dx;
+        double gradient = (dx == 0) ? 1.0 : dy / dx;
 
         int xpxl1 = splashRound(x0);
-        SplashCoord yend = y0 + gradient * (xpxl1 - x0);
-        SplashCoord xgap = 1.0 - (x0 + 0.5 - splashFloor(x0 + 0.5));
+        double yend = y0 + gradient * (xpxl1 - x0);
+        double xgap = 1.0 - (x0 + 0.5 - splashFloor(x0 + 0.5));
         int ypxl1 = splashFloor(yend);
 
         if (steep) {
@@ -2184,7 +2184,7 @@ void Splash::strokeHairline(const SplashPath &path)
             }
         }
 
-        SplashCoord intery = yend + gradient;
+        double intery = yend + gradient;
 
         int xpxl2 = splashRound(x1);
         yend = y1 + gradient * (xpxl2 - x1);
@@ -2213,7 +2213,7 @@ void Splash::strokeHairline(const SplashPath &path)
 
         for (int x = xpxl1 + 1; x < xpxl2; ++x) {
             int iy = splashFloor(intery);
-            SplashCoord frac = intery - iy;
+            double frac = intery - iy;
             unsigned char alpha1 = (unsigned char)splashRound((1.0 - frac) * 255);
             unsigned char alpha2 = (unsigned char)splashRound(frac * 255);
 
