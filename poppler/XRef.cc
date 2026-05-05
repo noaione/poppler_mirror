@@ -42,6 +42,7 @@
 // Copyright (C) 2026 Adam Sampson <ats@offog.org>
 // Copyright (C) 2026 Stefan Brüns <stefan.bruens@rwth-aachen.de>
 // Copyright (C) 2026 Dirk Müller <dmueller@suse.com>
+// Copyright (C) 2026 noaione <noaione@n4o.xyz>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
