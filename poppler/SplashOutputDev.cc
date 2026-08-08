@@ -85,8 +85,6 @@
 #include "SplashOutputDev.h"
 #include <algorithm>
 
-static const double s_minLineWidth = 0.0;
-
 static inline void convertGfxColor(SplashColorPtr dest, const SplashColorMode colorMode, const GfxColorSpace *colorSpace, const GfxColor &src)
 {
     switch (colorMode) {
@@ -1232,6 +1230,8 @@ SplashOutputDev::SplashOutputDev(SplashColorMode colorModeA, int bitmapRowPadA, 
     enableFreeType = true;
     enableFreeTypeHinting = false;
     enableSlightHinting = false;
+    glyphFillMode = splashGlyphFillBitmap;
+    minLineWidth = 0.0;
     setupScreenParams(72.0, 72.0);
     if (paperColorA != nullptr) {
         splashColorCopy(paperColor, paperColorA);
@@ -1246,7 +1246,7 @@ SplashOutputDev::SplashOutputDev(SplashColorMode colorModeA, int bitmapRowPadA, 
 
     bitmap = new SplashBitmap(1, 1, bitmapRowPad, colorMode, colorMode != splashModeMono1, bitmapTopDown);
     splash = new Splash(bitmap, vectorAntialias, &screenParams);
-    splash->setMinLineWidth(s_minLineWidth);
+    splash->setMinLineWidth(minLineWidth);
     splash->setThinLineMode(thinLineMode);
     splash->setZeroWidthLineMode(zeroWidthLineMode);
     splash->clear(paperColor, 0);
@@ -1352,7 +1352,7 @@ void SplashOutputDev::startPage(int /*pageNum*/, GfxState *state, XRef *xrefA)
     splash = new Splash(bitmap, vectorAntialias, &screenParams);
     splash->setThinLineMode(thinLineMode);
     splash->setZeroWidthLineMode(zeroWidthLineMode);
-    splash->setMinLineWidth(s_minLineWidth);
+    splash->setMinLineWidth(minLineWidth);
     if (state) {
         splash->setMatrix(state->getCTM());
     }
@@ -2152,7 +2152,7 @@ void SplashOutputDev::drawChar(GfxState *state, double x, double y, double /*dx*
     if (doStroke && lineWidth == 0.0) {
         splash->setLineWidth(1 / state->getVDPI());
     }
-    if (doStroke || doClip) {
+    if (doStroke || doClip || (doFill && glyphFillMode == splashGlyphFillPath)) {
         if ((path = font->getGlyphPath(code))) {
             path->offset(x, y);
         }
@@ -2179,7 +2179,11 @@ void SplashOutputDev::drawChar(GfxState *state, double x, double y, double /*dx*
         // fill
     } else if (doFill) {
         setOverprintMask(state->getFillColorSpace(), state->getFillOverprint(), state->getOverprintMode(), &state->getFillColor());
-        splash->fillChar(x, y, code, font);
+        if (glyphFillMode == splashGlyphFillPath && path) {
+            splash->fill(path, false);
+        } else {
+            splash->fillChar(x, y, code, font);
+        }
 
         // stroke
     } else if (doStroke) {
@@ -2500,7 +2504,7 @@ void SplashOutputDev::type3D1(GfxState *state, double /*wx*/, double /*wy*/, dou
         splash->clear(color);
         color[0] = 0xff;
     }
-    splash->setMinLineWidth(s_minLineWidth);
+    splash->setMinLineWidth(minLineWidth);
     splash->setThinLineMode(splashThinLineDefault);
     splash->setZeroWidthLineMode(splashZeroWidthLineDefault);
     splash->setFillPattern(new SplashSolidColor(color));
@@ -3927,7 +3931,7 @@ void SplashOutputDev::beginTransparencyGroup(GfxState *state, const std::array<d
     splash = new Splash(bitmap, vectorAntialias, transpGroup->origSplash->getScreen());
     splash->setThinLineMode(transpGroup->origSplash->getThinLineMode());
     splash->setZeroWidthLineMode(transpGroup->origSplash->getZeroWidthLineMode());
-    splash->setMinLineWidth(s_minLineWidth);
+    splash->setMinLineWidth(minLineWidth);
     //~ Acrobat apparently copies at least the fill and stroke colors, and
     //~ maybe other state(?) -- but not the clipping path (and not sure
     //~ what else)
@@ -4384,7 +4388,7 @@ bool SplashOutputDev::tilingPatternFill(GfxState *state, Gfx *gfxA, Catalog * /*
     }
     splash->setThinLineMode(formerSplash->getThinLineMode());
     splash->setZeroWidthLineMode(formerSplash->getZeroWidthLineMode());
-    splash->setMinLineWidth(s_minLineWidth);
+    splash->setMinLineWidth(minLineWidth);
     if (doFastBlit) {
         // drawImage would colorize the greyscale pattern in tilingBitmapSrc buffer accessor while tiling.
         // blitImage can't, it has no buffer accessor. We instead colorize the pattern prototype in advance.
