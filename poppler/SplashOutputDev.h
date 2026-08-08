@@ -345,6 +345,17 @@ public:
 
     SplashZeroWidthLineMode getZeroWidthLineMode() { return zeroWidthLineMode; }
     void setZeroWidthLineMode(SplashZeroWidthLineMode zeroWidthLineModeA) { zeroWidthLineMode = zeroWidthLineModeA; }
+
+    SplashGlyphFillMode getGlyphFillMode() { return glyphFillMode; }
+    void setGlyphFillMode(SplashGlyphFillMode glyphFillModeA) { glyphFillMode = glyphFillModeA; }
+
+    // Minimum stroke width, in device pixels. Strokes thinner than this
+    // (after the CTM is applied) are widened to this value. 0 (the
+    // default) disables this and preserves the original behavior. This
+    // helps avoid sub-pixel gaps at sharp corners of very thin strokes
+    // (e.g. text rendered in stroke mode with a hairline-ish width).
+    double getMinLineWidth() { return minLineWidth; }
+    void setMinLineWidth(double minLineWidthA) { minLineWidth = minLineWidthA; }
 protected:
     void doUpdateFont(GfxState *state);
 
@@ -387,6 +398,8 @@ private:
     bool skipHorizText;
     bool skipRotatedText;
     SplashZeroWidthLineMode zeroWidthLineMode;
+    SplashGlyphFillMode glyphFillMode;
+    double minLineWidth;
 
     PDFDoc *doc; // the current document
     XRef *xref; // the xref of the current document
