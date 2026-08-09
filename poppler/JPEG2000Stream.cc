@@ -15,6 +15,7 @@
 // Copyright 2025, 2026 g10 Code GmbH, Author: Sune Stolborg Vuorela <sune@vuorela.dk>
 // Copyright (C) 2025 Arnav V <arnav0872@gmail.com>
 // Copyright (C) 2026 Adam Sampson <ats@offog.org>
+// Copyright (C) 2026 noaione <noaione@n4o.xyz>
 //
 // Licensed under GPLv2 or later
 //
@@ -151,27 +152,15 @@ bool JPXStream::isBinary(bool /*last*/) const
 
 void JPXStream::getImageParams(int *bitsPerComponent, StreamColorSpaceMode *csMode, bool *hasAlpha)
 {
-    if (unlikely(priv->inited == false)) {
-        init();
-    }
-
     *bitsPerComponent = 8;
     *hasAlpha = false;
-    int numComps = (priv->image) ? priv->image->numcomps : 1;
-    if (priv->image) {
-        if (priv->image->color_space == OPJ_CLRSPC_SRGB && numComps == 4) {
-            numComps = 3;
-            *hasAlpha = true;
-        } else if (priv->image->color_space == OPJ_CLRSPC_SYCC && numComps == 4) {
-            numComps = 3;
-            *hasAlpha = true;
-        } else if (numComps == 2) {
-            numComps = 1;
-        } else if (numComps > 4) {
-            *hasAlpha = true;
-            numComps = 4;
-        }
+
+    int numComps = 1;
+    if (!peekImageInfo(&numComps, hasAlpha)) {
+        numComps = 1;
+        *hasAlpha = false;
     }
+
     if (numComps == 3) {
         *csMode = streamCSDeviceRGB;
     } else if (numComps == 4) {
@@ -408,4 +397,131 @@ error:
     } else {
         error(errSyntaxError, -1, "Did no succeed opening JPX Stream.");
     }
+}
+
+// Reads only the OpenJPEG header (no opj_decode()/tile entropy decoding) to obtain
+// numcomps/color_space. Used by getImageParams() so that callers which only need
+// image metadata (e.g. listing/inspection) don't pay for a full JPX pixel decode.
+// Mirrors JPXStreamPrivate::init2()'s stream/decoder setup and JP2->J2K->JPT
+// fallback chain, but stops right after opj_read_header().
+static bool jpxReadHeaderOnly(OPJ_CODEC_FORMAT format, const unsigned char *buf, int length, bool indexed, OPJ_UINT32 *numComps, OPJ_COLOR_SPACE *colorSpace)
+{
+    JPXData jpxData;
+
+    jpxData.data = buf;
+    jpxData.pos = 0;
+    jpxData.size = length;
+
+    opj_stream_t *stream;
+
+    stream = opj_stream_default_create(OPJ_TRUE);
+
+    opj_stream_set_user_data(stream, &jpxData, nullptr);
+
+    opj_stream_set_read_function(stream, jpxRead_callback);
+    opj_stream_set_skip_function(stream, jpxSkip_callback);
+    opj_stream_set_seek_function(stream, jpxSeek_callback);
+    /* Set the length to avoid an assert */
+    opj_stream_set_user_data_length(stream, length);
+
+    opj_codec_t *decoder;
+
+    /* Use default decompression parameters */
+    opj_dparameters_t parameters;
+    opj_set_default_decoder_parameters(&parameters);
+    if (indexed) {
+        parameters.flags |= OPJ_DPARAMETERS_IGNORE_PCLR_CMAP_CDEF_FLAG;
+    }
+
+    /* Get the decoder handle of the format */
+    decoder = opj_create_decompress(format);
+    if (decoder == nullptr) {
+        error(errSyntaxWarning, -1, "Unable to create decoder");
+        goto error;
+    }
+
+    /* Catch events using our callbacks */
+    opj_set_warning_handler(decoder, libopenjpeg_warning_callback, nullptr);
+    opj_set_error_handler(decoder, libopenjpeg_error_callback, nullptr);
+
+    /* Setup the decoder decoding parameters */
+    if (!opj_setup_decoder(decoder, &parameters)) {
+        error(errSyntaxWarning, -1, "Unable to set decoder parameters");
+        goto error;
+    }
+
+    {
+        opj_image_t *image = nullptr;
+        if (!opj_read_header(stream, decoder, &image)) {
+            error(errSyntaxWarning, -1, "Unable to read header");
+            goto error;
+        }
+
+        *numComps = image->numcomps;
+        *colorSpace = image->color_space;
+
+        opj_image_destroy(image);
+        opj_destroy_codec(decoder);
+        opj_stream_destroy(stream);
+        return true;
+    }
+
+error:
+    opj_stream_destroy(stream);
+    opj_destroy_codec(decoder);
+    if (format == OPJ_CODEC_JP2) {
+        return jpxReadHeaderOnly(OPJ_CODEC_J2K, buf, length, indexed, numComps, colorSpace);
+    } else if (format == OPJ_CODEC_J2K) {
+        return jpxReadHeaderOnly(OPJ_CODEC_JPT, buf, length, indexed, numComps, colorSpace);
+    }
+    return false;
+}
+
+bool JPXStream::peekImageInfo(int *numComps, bool *hasAlpha)
+{
+    Object oLen, cspace;
+    if (getDict()) {
+        oLen = getDict()->lookup("Length");
+        cspace = getDict()->lookup("ColorSpace");
+    }
+
+    int bufSize = BUFFER_INITIAL_SIZE;
+    if (oLen.isInt() && oLen.getInt() > 0) {
+        bufSize = oLen.getInt();
+    }
+
+    bool indexed = false;
+    if (cspace.isArrayOfLengthAtLeast(1)) {
+        const Object cstype = cspace.arrayGet(0);
+        if (cstype.isName("Indexed")) {
+            indexed = true;
+        }
+    }
+
+    const std::vector<unsigned char> buf = str->toUnsignedChars(bufSize);
+
+    OPJ_UINT32 rawNumComps = 0;
+    OPJ_COLOR_SPACE colorSpace = OPJ_CLRSPC_UNSPECIFIED;
+    if (!jpxReadHeaderOnly(OPJ_CODEC_JP2, buf.data(), buf.size(), indexed, &rawNumComps, &colorSpace)) {
+        return false;
+    }
+
+    int n = static_cast<int>(rawNumComps);
+    bool alpha = false;
+    if (colorSpace == OPJ_CLRSPC_SRGB && n == 4) {
+        n = 3;
+        alpha = true;
+    } else if (colorSpace == OPJ_CLRSPC_SYCC && n == 4) {
+        n = 3;
+        alpha = true;
+    } else if (n == 2) {
+        n = 1;
+    } else if (n > 4) {
+        n = 4;
+        alpha = true;
+    }
+
+    *numComps = n;
+    *hasAlpha = alpha;
+    return true;
 }

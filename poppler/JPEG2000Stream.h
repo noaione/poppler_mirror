@@ -11,6 +11,7 @@
 // Copyright 2024, 2025 Nelson Benítez León <nbenitezl@gmail.com>
 // Copyright 2025, 2026 g10 Code GmbH, Author: Sune Stolborg Vuorela <sune@vuorela.dk>
 // Copyright (C) 2025 Arnav V <arnav0872@gmail.com>
+// Copyright (C) 2026 noaione <noaione@n4o.xyz>
 //
 // Licensed under GPLv2 or later
 //
@@ -57,6 +58,7 @@ private:
     bool handleJPXtransparency;
 
     void init();
+    bool peekImageInfo(int *numComps, bool *hasAlpha);
     bool hasGetChars() override { return true; }
     int getChars(int nChars, unsigned char *buffer) override;
 };
