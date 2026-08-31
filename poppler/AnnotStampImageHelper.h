@@ -14,7 +14,8 @@
 #ifndef ANNOTSTAMPIMAGEHELPER_H
 #define ANNOTSTAMPIMAGEHELPER_H
 
-#include "Object.h"
+#include "Ref.h"
+#include "poppler_private_export.h"
 
 class PDFDoc;
 
