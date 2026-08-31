@@ -32,6 +32,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 #include <unordered_set>
 
 class Dict;
