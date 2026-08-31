@@ -36,7 +36,7 @@ private:
     static std::string getTaggedNameForFont(const GfxFont *font);
     Object createFontStreamFromData(std::vector<char> &&data, Ref &ref, const std::string &subtype) const;
 
-    Object createNewSubsetFont(const GfxFont *oldFont, SubsetFontResult &&subsettingResult, Ref &newFontRef) const;
+    Object createNewSubsetFont(const GfxFont *oldFont, SubsetFontResult &&subsettingResult, const std::vector<Unicode> &unicodeValues, Ref &newFontRef) const;
 
     // Harfbuzz related APIs
     static SubsetFontResult hbSubsetFont(std::string &fontStream, const std::vector<Unicode> &unicodeValues);
