@@ -17,6 +17,8 @@
 #include "Ref.h"
 #include "poppler_private_export.h"
 
+#include <vector>
+
 class PDFDoc;
 
 enum ColorSpace
