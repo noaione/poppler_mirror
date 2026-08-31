@@ -320,7 +320,7 @@ FontSubsetter::GetSubsetFontsResult FontSubsetter::getSubsetFonts(const FontStri
         }
 
         Ref newFontRef = Ref::INVALID();
-        Object newFontObj = createNewSubsetFont(font.get(), subsettingResult, newFontRef);
+        Object newFontObj = createNewSubsetFont(font.get(), std::move(subsettingResult), newFontRef);
 
         if (newFontObj.isNull()) {
             continue;
@@ -431,7 +431,7 @@ static std::unique_ptr<Array> createWidthArray(const unsigned char *data, size_t
     return widths;
 }
 
-Object FontSubsetter::createNewSubsetFont(const GfxFont *oldFont, SubsetFontResult &subsettingResult, Ref &newFontRef) const
+Object FontSubsetter::createNewSubsetFont(const GfxFont *oldFont, SubsetFontResult &&subsettingResult, Ref &newFontRef) const
 {
     XRef *xref = doc->getXRef();
 
