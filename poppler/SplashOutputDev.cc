@@ -1232,6 +1232,10 @@ SplashOutputDev::SplashOutputDev(SplashColorMode colorModeA, int bitmapRowPadA, 
     enableSlightHinting = false;
     glyphFillMode = splashGlyphFillBitmap;
     minLineWidth = 0.0;
+    // This member was never initialised, so the zero-width line behaviour of a
+    // fresh SplashOutputDev depended on whatever happened to be in the heap.
+    // Pin it to the upstream/Acrobat-compatible behaviour.
+    zeroWidthLineMode = splashZeroWidthLineDefault;
     setupScreenParams(72.0, 72.0);
     if (paperColorA != nullptr) {
         splashColorCopy(paperColor, paperColorA);

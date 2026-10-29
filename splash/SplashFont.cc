@@ -115,9 +115,14 @@ bool SplashFont::getGlyph(int c, int xFrac, int yFrac, SplashGlyphBitmap *bitmap
     unsigned char *p;
     int i, j, k;
 
-    // no fractional coordinates for large glyphs or non-anti-aliased
-    // glyphs
-    if (!aa || glyphH > 50) {
+    // Fractional positioning is what keeps a glyph bitmap on the same spot as
+    // the outline it was rasterized from. Disabling it for tall glyphs made the
+    // two disagree by up to half a device pixel, which shows up as a seam (a
+    // thin light line) wherever a document paints the same glyph twice - once
+    // stroked or as a vector outline, once filled. The glyph cache already
+    // copes with oversized bitmaps by falling back to an uncached temporary, so
+    // there is no reason to gate this on the glyph size.
+    if (!aa) {
         xFrac = yFrac = 0;
     }
 
