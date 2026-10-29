@@ -72,20 +72,19 @@ enum SplashThinLineMode
 
 enum SplashZeroWidthLineMode
 {
-    splashZeroWidthLineDefault,  // use default 1px behavior
-    splashZeroWidthLineHairline, // draw zero-width lines as hairlines
-    splashZeroWidthLineNothing   // do not draw zero-width lines
+    splashZeroWidthLineDefault, // use default 1px behavior
+    splashZeroWidthLineNothing // do not draw zero-width lines
 };
 
 enum SplashGlyphFillMode
 {
     splashGlyphFillBitmap, // rasterize glyphs via FreeType's own renderer (default, fastest;
                            //   glyph bitmaps are cached and reused across repeated characters)
-    splashGlyphFillPath    // decompose the glyph outline into a path and fill it through
-                           //   Splash's own scan converter instead; some fonts have
-                           //   self-intersecting contours that FreeType's rasterizer
-                           //   mis-renders (spurious filled slivers), and filling the
-                           //   same outline as a path avoids the artifact
+    splashGlyphFillPath // decompose the glyph outline into a path and fill it through
+                        //   Splash's own scan converter instead; some fonts have
+                        //   self-intersecting contours that FreeType's rasterizer
+                        //   mis-renders (spurious filled slivers), and filling the
+                        //   same outline as a path avoids the artifact
 };
 
 // number of components in each color mode
